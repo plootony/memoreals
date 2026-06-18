@@ -3,12 +3,15 @@ import { ref, computed } from 'vue'
 
 const PIN_KEY = 'lock_pin'
 const TIMEOUT_KEY = 'lock_timeout'
+const LOCKED_KEY = 'lock_state' // sessionStorage — сбрасывается при закрытии вкладки
 
 export const useLockStore = defineStore('lock', () => {
-  const isLocked = ref(false)
   const pin = ref(localStorage.getItem(PIN_KEY) || '')
   const timeoutMinutes = ref(Number(localStorage.getItem(TIMEOUT_KEY) || '5'))
   const hasPin = computed(() => pin.value.length > 0)
+
+  // Если PIN установлен — при загрузке/обновлении страницы всегда блокируем
+  const isLocked = ref(hasPin.value)
 
   let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -31,6 +34,7 @@ export const useLockStore = defineStore('lock', () => {
     pin.value = newPin
     if (newPin) {
       localStorage.setItem(PIN_KEY, newPin)
+      isLocked.value = true // сразу блокируем после установки нового PIN
     } else {
       localStorage.removeItem(PIN_KEY)
       isLocked.value = false
@@ -58,7 +62,8 @@ export const useLockStore = defineStore('lock', () => {
     const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click']
     const handler = () => { if (!isLocked.value) resetTimer() }
     events.forEach(e => window.addEventListener(e, handler, { passive: true }))
-    resetTimer()
+    // Не запускаем таймер сразу — ждём первого разблокирования
+    if (!isLocked.value) resetTimer()
   }
 
   return { isLocked, pin, timeoutMinutes, hasPin, lock, unlock, setPin, setTimeout: setTimeout_, resetTimer, setupActivity }
