@@ -1,9 +1,9 @@
 import api from '@/api'
 
-export async function uploadImage(file: File): Promise<string> {
+export async function uploadImage(file: File, type?: 'cover'): Promise<string> {
   const form = new FormData()
   form.append('image', file)
-  const res = await api.post('/images', form, {
+  const res = await api.post('/images' + (type ? `?type=${type}` : ''), form, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
   return res.data.url

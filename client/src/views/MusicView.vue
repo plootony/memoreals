@@ -80,7 +80,7 @@ function pickCover(trackId: string) {
 async function onCoverSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file || !editingTrackId.value) return
-  const url = await uploadImage(file)
+  const url = await uploadImage(file, 'cover')
   await player.updateTrack(editingTrackId.value!, { cover: url })
   editingTrackId.value = null
   ;(e.target as HTMLInputElement).value = ''

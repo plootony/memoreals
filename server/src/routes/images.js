@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
+import sharp from 'sharp'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { unlink } from 'fs/promises'
@@ -9,25 +10,40 @@ import { requireAuth } from '../middleware/auth.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const UPLOADS_DIR = join(__dirname, '../../uploads')
 
-const storage = multer.diskStorage({
-  destination: UPLOADS_DIR,
-  filename: (req, file, cb) => {
-    const ext = file.mimetype.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg'
-    cb(null, `img_${uuidv4()}.${ext}`)
-  }
-})
+// Принимаем в память, потом оптимизируем и пишем на диск
 const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB оригинал
   fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith('image/'))
 })
 
 const router = Router()
 router.use(requireAuth)
 
-router.post('/', upload.single('image'), (req, res) => {
+router.post('/', upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image file' })
-  res.json({ url: `/uploads/${req.file.filename}` })
+  try {
+    const filename = `img_${uuidv4()}.webp`
+    const outPath = join(UPLOADS_DIR, filename)
+
+    const isCover = req.query.type === 'cover'
+    const transform = sharp(req.file.buffer)
+
+    if (isCover) {
+      // Обложки треков: квадрат 400×400
+      transform.resize(400, 400, { fit: 'cover' })
+    } else {
+      // Фото в контенте: максимум Full HD
+      transform.resize(1920, 1080, { fit: 'inside', withoutEnlargement: true })
+    }
+
+    await transform.webp({ quality: 82 }).toFile(outPath)
+
+    res.json({ url: `/uploads/${filename}` })
+  } catch (e) {
+    console.error('Image processing error:', e.message)
+    res.status(500).json({ error: 'Image processing failed' })
+  }
 })
 
 router.delete('/:filename', async (req, res) => {
