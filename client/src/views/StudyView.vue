@@ -153,6 +153,11 @@ async function deleteChapter(topicId: string, chapterId: string) {
   await loadTopics()
 }
 
+function startNewTopicInput() {
+  newTopicInput.value = true
+  nextTick(() => (document.getElementById('new-topic-inp') as HTMLInputElement)?.focus())
+}
+
 function startNewChapter(topicId: string) {
   newChapterInputFor.value = topicId
   expandedTopics.value.add(topicId)
@@ -189,7 +194,7 @@ onMounted(loadTopics)
       <!-- Header -->
       <div class="h-11 px-3 border-b flex items-center justify-between flex-shrink-0">
         <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Учёба</span>
-        <button @click="newTopicInput = true; nextTick(() => (document.getElementById('new-topic-inp') as HTMLInputElement)?.focus())"
+        <button @click="startNewTopicInput()"
           class="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Новая тема">
           <FolderPlus class="w-3.5 h-3.5" />
         </button>

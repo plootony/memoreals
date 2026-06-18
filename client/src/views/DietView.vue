@@ -57,7 +57,7 @@ const weightInput = ref('')
 const weightDate = ref(new Date().toISOString().slice(0, 10))
 const weightNote = ref('')
 const editingWeightGoal = ref(false)
-const weightGoalInput = ref<number | null>(null)
+const weightGoalInput = ref<number | undefined>(undefined)
 
 async function loadWeight() {
   const res = await api.get('/diet/weight')
@@ -575,7 +575,7 @@ async function saveGoals() {
           <p class="text-xs text-muted-foreground">кг</p>
         </Card>
         <Card class="p-3 text-center cursor-pointer hover:bg-accent/30"
-          @click="editingWeightGoal = true; weightGoalInput = weightGoal">
+          @click="editingWeightGoal = true; weightGoalInput = weightGoal ?? undefined">
           <p class="text-xs text-muted-foreground mb-1">Цель</p>
           <div v-if="!editingWeightGoal">
             <p class="text-2xl font-bold text-green-500">{{ weightGoal ?? '—' }}</p>
