@@ -12,6 +12,7 @@ import dietRoutes from './routes/diet.js'
 import studyRoutes from './routes/study.js'
 import settingsRoutes from './routes/settings.js'
 import imagesRoutes from './routes/images.js'
+import plansRoutes from './routes/plans.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = process.env.PORT || 3001
@@ -30,6 +31,7 @@ app.use('/api/diet', dietRoutes)
 app.use('/api/study', studyRoutes)
 app.use('/api/settings', settingsRoutes)
 app.use('/api/images', imagesRoutes)
+app.use('/api/plans', plansRoutes)
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 

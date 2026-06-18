@@ -3,17 +3,21 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useLockStore } from '@/stores/lock'
+import { useToast } from '@/composables/useToast'
 import MiniPlayer from '@/components/MiniPlayer.vue'
 import LockScreen from '@/components/LockScreen.vue'
 import TopProgressBar from '@/components/TopProgressBar.vue'
+import Toaster from '@/components/Toaster.vue'
+import api from '@/api'
 import {
   BookOpen, Wallet, Music, Apple, GraduationCap, Settings,
-  Menu, X, Moon, Sun, ChevronLeft, ChevronRight, Lock
+  Menu, X, Moon, Sun, ChevronLeft, ChevronRight, Lock, ListTodo
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const auth = useAuthStore()
 const lock = useLockStore()
+const { show } = useToast()
 const mobileOpen = ref(false)
 const collapsed = ref(localStorage.getItem('sidebar-collapsed') === 'true')
 const dark = ref(document.documentElement.classList.contains('dark'))
@@ -35,10 +39,50 @@ const navItems = [
   { to: '/music', label: 'Плеер', icon: Music },
   { to: '/diet', label: 'Диета', icon: Apple },
   { to: '/study', label: 'Учёба', icon: GraduationCap },
+  { to: '/plans', label: 'Планы', icon: ListTodo },
 ]
 
+// Проверка дедлайнов и показ напоминаний
+const shownReminders = new Set<string>()
+let reminderTimer: ReturnType<typeof setInterval> | null = null
+
+async function checkReminders() {
+  if (!auth.isAuthenticated) return
+  try {
+    const res = await api.get('/plans/tasks')
+    const { tasks, settings } = res.data
+    if (!settings.remindInterval) return
+    const now = Date.now()
+    for (const task of tasks) {
+      if (task.status === 'done' || !task.deadline || task.remindBefore == null) continue
+      const deadlineMs = new Date(task.deadline).getTime()
+      const remindMs = task.remindBefore * 60 * 1000
+      const key = `${task.id}-${task.deadline}`
+      if (deadlineMs - now <= remindMs && deadlineMs > now && !shownReminders.has(key)) {
+        shownReminders.add(key)
+        const mins = Math.round((deadlineMs - now) / 60000)
+        const label = mins < 60 ? `через ${mins} мин` : `через ${Math.round(mins / 60)} ч`
+        show({
+          type: task.priority === 'critical' ? 'error' : task.priority === 'high' ? 'warning' : 'info',
+          title: task.title,
+          message: `Дедлайн ${label}`,
+          duration: 8000,
+        })
+      }
+    }
+    // Обновляем интервал если изменился
+    if (reminderTimer) clearInterval(reminderTimer)
+    if (settings.remindInterval > 0) {
+      reminderTimer = setInterval(checkReminders, settings.remindInterval * 60 * 1000)
+    }
+  } catch {}
+}
+
 onMounted(() => {
-  if (auth.isAuthenticated) lock.setupActivity()
+  if (auth.isAuthenticated) {
+    lock.setupActivity()
+    checkReminders()
+  }
 })
 </script>
 
@@ -46,6 +90,7 @@ onMounted(() => {
   <div class="flex h-screen bg-background overflow-hidden">
     <TopProgressBar />
     <LockScreen />
+    <Toaster />
 
     <!-- Mobile overlay -->
     <div v-if="mobileOpen" class="fixed inset-0 z-20 bg-black/50 lg:hidden" @click="mobileOpen = false" />

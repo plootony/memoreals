@@ -33,6 +33,11 @@ function getDefaultData() {
     weightGoal: null,
     debts: [],
     cushion: { goal: 0, contributions: [] },
-    study: []
+    study: [],
+    plans: {
+      tasks: [],
+      categories: ['Работа', 'Личное', 'Учёба', 'Здоровье'],
+      settings: { remindInterval: 30 }
+    }
   }
 }
