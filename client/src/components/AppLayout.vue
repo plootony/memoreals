@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useLockStore } from '@/stores/lock'
 import MiniPlayer from '@/components/MiniPlayer.vue'
 import LockScreen from '@/components/LockScreen.vue'
+import TopProgressBar from '@/components/TopProgressBar.vue'
 import {
   BookOpen, Wallet, Music, Apple, GraduationCap, Settings,
   Menu, X, Moon, Sun, ChevronLeft, ChevronRight, Lock
@@ -43,6 +44,7 @@ onMounted(() => {
 
 <template>
   <div class="flex h-screen bg-background overflow-hidden">
+    <TopProgressBar />
     <LockScreen />
 
     <!-- Mobile overlay -->

@@ -22,7 +22,7 @@ import {
   List, ListOrdered, ListChecks,
   Quote, Code, Code2, Link as LinkIcon,
   AlignLeft, AlignCenter, AlignRight,
-  Highlighter, ImagePlus, Minus, Save
+  Highlighter, ImagePlus, Minus, Save, Loader2
 } from 'lucide-vue-next'
 
 interface Chapter { id: string; title: string; content: string; order: number; updatedAt: string }
@@ -34,6 +34,7 @@ const selectedTopicId = ref<string | null>(null)
 const selectedChapter = ref<Chapter | null>(null)
 const isDirty = ref(false)
 const saving = ref(false)
+const imageUploading = ref(false)
 
 // Inline editing state
 const editingNode = ref<{ type: 'topic' | 'chapter'; topicId: string; id: string } | null>(null)
@@ -167,7 +168,7 @@ function startNewChapter(topicId: string) {
 
 // --- Editor actions ---
 async function insertImage() {
-  const url = await pickAndUpload()
+  const url = await pickAndUpload(v => imageUploading.value = v)
   if (url) editor.value?.chain().focus().setImage({ src: url }).run()
 }
 
@@ -372,8 +373,9 @@ onMounted(loadTopics)
           <div class="w-px h-5 bg-border mx-0.5" />
           <button @click="setLink" :class="['p-1.5 rounded hover:bg-accent', editor?.isActive('link') ? 'bg-accent' : '']">
             <LinkIcon class="w-4 h-4" /></button>
-          <button @click="insertImage" class="p-1.5 rounded hover:bg-accent">
-            <ImagePlus class="w-4 h-4" /></button>
+          <button @click="insertImage" class="p-1.5 rounded hover:bg-accent" :disabled="imageUploading">
+            <Loader2 v-if="imageUploading" class="w-4 h-4 animate-spin" />
+            <ImagePlus v-else class="w-4 h-4" /></button>
 
           <div class="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
             <template v-if="saving"><span>Сохранение...</span></template>

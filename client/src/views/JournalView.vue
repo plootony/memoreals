@@ -10,7 +10,7 @@ import { pickAndUpload } from '@/lib/uploadImage'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Card from '@/components/ui/Card.vue'
-import { Plus, Search, ChevronLeft, Trash2, Bold, Italic, List, ListOrdered, Image as ImageIcon, BookOpen } from 'lucide-vue-next'
+import { Plus, Search, ChevronLeft, Trash2, Bold, Italic, List, ListOrdered, Image as ImageIcon, BookOpen, Loader2 } from 'lucide-vue-next'
 
 interface JournalEntry {
   id: string
@@ -29,6 +29,7 @@ const search = ref('')
 const filterYear = ref('')
 const filterMonth = ref('')
 const loading = ref(false)
+const imageUploading = ref(false)
 
 const editor = useEditor({
   extensions: [
@@ -111,7 +112,7 @@ async function deleteEntry(id: string) {
 }
 
 async function insertImage() {
-  const url = await pickAndUpload()
+  const url = await pickAndUpload(v => imageUploading.value = v)
   if (url) editor.value?.chain().focus().setImage({ src: url }).run()
 }
 
@@ -180,7 +181,10 @@ onMounted(load)
             <Button size="icon" variant="ghost" class="h-8 w-8" :class="{ 'bg-accent': editor?.isActive('italic') }" @click="editor?.chain().focus().toggleItalic().run()"><Italic class="w-3.5 h-3.5" /></Button>
             <Button size="icon" variant="ghost" class="h-8 w-8" :class="{ 'bg-accent': editor?.isActive('bulletList') }" @click="editor?.chain().focus().toggleBulletList().run()"><List class="w-3.5 h-3.5" /></Button>
             <Button size="icon" variant="ghost" class="h-8 w-8" :class="{ 'bg-accent': editor?.isActive('orderedList') }" @click="editor?.chain().focus().toggleOrderedList().run()"><ListOrdered class="w-3.5 h-3.5" /></Button>
-            <Button size="icon" variant="ghost" class="h-8 w-8" @click="insertImage"><ImageIcon class="w-3.5 h-3.5" /></Button>
+            <Button size="icon" variant="ghost" class="h-8 w-8" @click="insertImage" :disabled="imageUploading">
+              <Loader2 v-if="imageUploading" class="w-3.5 h-3.5 animate-spin" />
+              <ImageIcon v-else class="w-3.5 h-3.5" />
+            </Button>
           </div>
           <div class="flex items-center gap-2 ml-auto">
             <Button v-if="isEditing" variant="outline" size="sm" @click="isEditing = false; editor?.setEditable(false)">Отмена</Button>

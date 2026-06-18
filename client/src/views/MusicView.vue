@@ -9,7 +9,7 @@ import Input from '@/components/ui/Input.vue'
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
   Volume2, VolumeX, Upload, Trash2, Music, Plus, ListPlus,
-  Pencil, Check, X, ImagePlus, ListX
+  Pencil, Check, X, ImagePlus, ListX, Loader2
 } from 'lucide-vue-next'
 
 const player = usePlayerStore()
@@ -26,6 +26,7 @@ const coverInputRef = ref<HTMLInputElement | null>(null)
 
 // Upload
 const uploading = ref(false)
+const coverUploading = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 // Playlist dropdown
@@ -80,10 +81,15 @@ function pickCover(trackId: string) {
 async function onCoverSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file || !editingTrackId.value) return
-  const url = await uploadImage(file, 'cover')
-  await player.updateTrack(editingTrackId.value!, { cover: url })
-  editingTrackId.value = null
-  ;(e.target as HTMLInputElement).value = ''
+  coverUploading.value = true
+  try {
+    const url = await uploadImage(file, 'cover')
+    await player.updateTrack(editingTrackId.value!, { cover: url })
+    editingTrackId.value = null
+  } finally {
+    coverUploading.value = false
+    ;(e.target as HTMLInputElement).value = ''
+  }
 }
 
 async function removeCover(trackId: string) {
@@ -230,8 +236,9 @@ onUnmounted(() => document.removeEventListener('click', closePlaylistMenu))
         <!-- Actions -->
         <div class="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
           <!-- Set cover -->
-          <button class="p-1.5 rounded hover:bg-background text-muted-foreground hover:text-foreground" @click.stop="pickCover(track.id)" title="Обложка">
-            <ImagePlus class="w-3.5 h-3.5" />
+          <button class="p-1.5 rounded hover:bg-background text-muted-foreground hover:text-foreground" @click.stop="pickCover(track.id)" title="Обложка" :disabled="coverUploading">
+            <Loader2 v-if="coverUploading && editingTrackId === track.id" class="w-3.5 h-3.5 animate-spin" />
+            <ImagePlus v-else class="w-3.5 h-3.5" />
           </button>
           <!-- Remove cover -->
           <button v-if="track.cover" class="p-1.5 rounded hover:bg-background text-muted-foreground hover:text-foreground" @click.stop="removeCover(track.id)" title="Убрать обложку">
