@@ -22,7 +22,8 @@
       "Bash(cat /tmp/sshtool/node_modules/node-ssh/package.json | grep '\"main\"\\\\|\"exports\"' | head -5)",
       "Read(//tmp/sshtool/node_modules/node-ssh/**)",
       "Bash(node -e *)",
-      "Bash(npx vue-tsc *)"
+      "Bash(npx vue-tsc *)",
+      "Bash(git rm *)"
     ]
   }
 }
