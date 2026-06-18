@@ -8,10 +8,12 @@ import MiniPlayer from '@/components/MiniPlayer.vue'
 import LockScreen from '@/components/LockScreen.vue'
 import TopProgressBar from '@/components/TopProgressBar.vue'
 import Toaster from '@/components/Toaster.vue'
+import GlobalSearch from '@/components/GlobalSearch.vue'
 import api from '@/api'
 import {
   BookOpen, Wallet, Music, Apple, GraduationCap, Settings,
-  Menu, X, Moon, Sun, ChevronLeft, ChevronRight, Lock, ListTodo
+  Menu, X, Moon, Sun, ChevronLeft, ChevronRight, Lock, ListTodo,
+  LayoutDashboard, Search
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -33,7 +35,10 @@ function toggleCollapse() {
   localStorage.setItem('sidebar-collapsed', String(collapsed.value))
 }
 
+const showSearch = ref(false)
+
 const navItems = [
+  { to: '/', label: 'Главная', icon: LayoutDashboard },
   { to: '/journal', label: 'Дневник', icon: BookOpen },
   { to: '/finance', label: 'Финансы', icon: Wallet },
   { to: '/music', label: 'Плеер', icon: Music },
@@ -91,6 +96,7 @@ onMounted(() => {
     <TopProgressBar />
     <LockScreen />
     <Toaster />
+    <GlobalSearch v-if="showSearch" @close="showSearch = false" />
 
     <!-- Mobile overlay -->
     <div v-if="mobileOpen" class="fixed inset-0 z-20 bg-black/50 lg:hidden" @click="mobileOpen = false" />
@@ -101,10 +107,15 @@ onMounted(() => {
       mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       collapsed ? 'w-14' : 'w-56'
     ]">
-      <!-- Logo + collapse toggle -->
-      <div class="flex items-center h-14 border-b flex-shrink-0" :class="collapsed ? 'justify-center px-0' : 'px-4 justify-between'">
+      <!-- Logo + search + collapse toggle -->
+      <div class="flex items-center h-14 border-b flex-shrink-0" :class="collapsed ? 'justify-center px-0' : 'px-3 justify-between'">
         <span v-if="!collapsed" class="font-bold text-lg truncate">MemoReals</span>
-        <button class="lg:hidden p-1" v-if="!collapsed" @click="mobileOpen = false"><X class="w-4 h-4" /></button>
+        <div v-if="!collapsed" class="flex items-center gap-0.5">
+          <button class="p-1.5 rounded hover:bg-accent text-muted-foreground hidden lg:flex" @click="showSearch = true" title="Поиск (/)">
+            <Search class="w-4 h-4" />
+          </button>
+          <button class="lg:hidden p-1" @click="mobileOpen = false"><X class="w-4 h-4" /></button>
+        </div>
         <button
           class="hidden lg:flex p-1.5 rounded hover:bg-accent text-muted-foreground transition-colors"
           @click="toggleCollapse"
@@ -126,7 +137,7 @@ onMounted(() => {
           :class="[
             'flex items-center gap-3 px-2.5 py-2 rounded-md text-sm font-medium transition-colors',
             collapsed ? 'justify-center' : '',
-            route.path.startsWith(item.to)
+            (item.to === '/' ? route.path === '/' : route.path.startsWith(item.to))
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
           ]"
@@ -181,7 +192,10 @@ onMounted(() => {
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
       <header class="h-14 border-b flex items-center px-4 gap-3 bg-card lg:hidden">
         <button @click="mobileOpen = true"><Menu class="w-5 h-5" /></button>
-        <span class="font-semibold">MemoReals</span>
+        <span class="font-semibold flex-1">MemoReals</span>
+        <button @click="showSearch = true" class="p-1.5 rounded hover:bg-accent text-muted-foreground">
+          <Search class="w-4 h-4" />
+        </button>
       </header>
       <main class="flex-1 overflow-auto p-4 md:p-6">
         <slot />

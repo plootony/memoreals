@@ -8,7 +8,7 @@ import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Button from '@/components/ui/Button.vue'
 import Label from '@/components/ui/Label.vue'
-import { Lock, User, Key, Shield, LogOut } from 'lucide-vue-next'
+import { Lock, User, Key, Shield, LogOut, Download, Loader2 } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const lock = useLockStore()
@@ -93,6 +93,22 @@ function savePin() {
   pinMsg.value = newPin.value ? 'Код сохранён' : 'Блокировка отключена'
   pinError.value = false
   newPin2.value = ''
+}
+
+const exporting = ref(false)
+async function exportData() {
+  exporting.value = true
+  try {
+    const res = await api.get('/export', { responseType: 'blob' })
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `memoreals-backup-${new Date().toISOString().slice(0,10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  } finally {
+    exporting.value = false
+  }
 }
 
 function lockNow() {
@@ -194,6 +210,20 @@ function logout() {
         </Button>
         <p v-if="pinMsg" :class="['text-sm', pinError ? 'text-destructive' : 'text-green-500']">{{ pinMsg }}</p>
       </div>
+    </Card>
+
+    <!-- Export -->
+    <Card class="p-5 space-y-3">
+      <div class="flex items-center gap-2">
+        <Download class="w-4 h-4 text-muted-foreground" />
+        <h2 class="font-semibold">Резервная копия</h2>
+      </div>
+      <p class="text-sm text-muted-foreground">Скачайте все ваши данные в формате JSON.</p>
+      <Button variant="outline" @click="exportData" :disabled="exporting" class="w-full justify-start">
+        <Loader2 v-if="exporting" class="w-4 h-4 mr-2 animate-spin" />
+        <Download v-else class="w-4 h-4 mr-2" />
+        {{ exporting ? 'Подготовка...' : 'Скачать данные' }}
+      </Button>
     </Card>
 
     <!-- Danger zone -->
