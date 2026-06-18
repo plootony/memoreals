@@ -19,8 +19,6 @@ jobs:
           script: |
             cd /root/memoreals
             git pull origin main
-            npm install
-            npm run build
-            npm prune --omit=dev --workspaces
+            npm install --workspace=server --omit=dev
             pm2 restart memoreals
             echo "✅ Deploy done at $(date)"
