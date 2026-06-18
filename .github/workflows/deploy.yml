@@ -17,9 +17,10 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
-            cd /home/${{ secrets.SSH_USER }}/memoreals
+            cd /root/memoreals
             git pull origin main
-            npm install --workspaces --if-present
+            npm install
             npm run build
+            npm prune --omit=dev --workspaces
             pm2 restart memoreals
             echo "✅ Deploy done at $(date)"
