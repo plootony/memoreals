@@ -215,5 +215,5 @@ onMounted(load)
   pointer-events: none;
   height: 0;
 }
-.tiptap img { max-width: 100%; border-radius: 0.5rem; }
+.tiptap img { max-width: calc(100% - 24px); max-height: 400px; width: auto; border-radius: 0.5rem; margin: 4px 12px; display: block; object-fit: contain; }
 </style>
