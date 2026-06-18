@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import api from '@/api'
+import { uploadImage } from '@/lib/uploadImage'
 import Button from '@/components/ui/Button.vue'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
@@ -79,12 +80,9 @@ function pickCover(trackId: string) {
 async function onCoverSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file || !editingTrackId.value) return
-  const reader = new FileReader()
-  reader.onload = async () => {
-    await player.updateTrack(editingTrackId.value!, { cover: reader.result as string })
-    editingTrackId.value = null
-  }
-  reader.readAsDataURL(file)
+  const url = await uploadImage(file)
+  await player.updateTrack(editingTrackId.value!, { cover: url })
+  editingTrackId.value = null
   ;(e.target as HTMLInputElement).value = ''
 }
 

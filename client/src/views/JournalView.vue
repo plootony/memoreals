@@ -6,6 +6,7 @@ import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import api from '@/api'
 import { formatDate } from '@/lib/utils'
+import { pickAndUpload } from '@/lib/uploadImage'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Card from '@/components/ui/Card.vue'
@@ -32,7 +33,7 @@ const loading = ref(false)
 const editor = useEditor({
   extensions: [
     StarterKit,
-    Image.configure({ allowBase64: true, inline: false }),
+    Image.configure({ inline: false }),
     Placeholder.configure({ placeholder: 'Начните писать...' }),
   ],
   editorProps: {
@@ -110,19 +111,8 @@ async function deleteEntry(id: string) {
 }
 
 async function insertImage() {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = 'image/*'
-  input.onchange = async (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      editor.value?.chain().focus().setImage({ src: reader.result as string }).run()
-    }
-    reader.readAsDataURL(file)
-  }
-  input.click()
+  const url = await pickAndUpload()
+  if (url) editor.value?.chain().focus().setImage({ src: url }).run()
 }
 
 onMounted(load)

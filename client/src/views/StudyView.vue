@@ -12,6 +12,7 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import api from '@/api'
 import { formatDate } from '@/lib/utils'
+import { pickAndUpload } from '@/lib/uploadImage'
 import Input from '@/components/ui/Input.vue'
 import {
   ChevronRight, ChevronDown, Plus, Trash2, Pencil, Check, X,
@@ -48,7 +49,7 @@ const newChapterTitle = ref('')
 const editor = useEditor({
   extensions: [
     StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false, underline: false }),
-    ImageExt.configure({ allowBase64: true }),
+    ImageExt.configure({ allowBase64: false }),
     Placeholder.configure({ placeholder: 'Начните конспектировать...' }),
     Underline,
     Highlight.configure({ multicolor: false }),
@@ -165,16 +166,9 @@ function startNewChapter(topicId: string) {
 }
 
 // --- Editor actions ---
-function insertImage() {
-  const input = document.createElement('input')
-  input.type = 'file'; input.accept = 'image/*'
-  input.onchange = () => {
-    const file = input.files?.[0]; if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => editor.value?.chain().focus().setImage({ src: reader.result as string }).run()
-    reader.readAsDataURL(file)
-  }
-  input.click()
+async function insertImage() {
+  const url = await pickAndUpload()
+  if (url) editor.value?.chain().focus().setImage({ src: url }).run()
 }
 
 function setLink() {
