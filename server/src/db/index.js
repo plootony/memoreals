@@ -1,10 +1,14 @@
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { mkdirSync } from 'fs'
 import { Low } from 'lowdb'
 import { JSONFile } from 'lowdb/node'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = join(__dirname, '../../data')
+
+// Гарантируем существование директории при любом старте
+mkdirSync(DATA_DIR, { recursive: true })
 
 function createDb(filename, defaults) {
   const adapter = new JSONFile(join(DATA_DIR, filename))
