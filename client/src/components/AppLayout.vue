@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useLockStore } from '@/stores/lock'
 import MiniPlayer from '@/components/MiniPlayer.vue'
+import LockScreen from '@/components/LockScreen.vue'
 import {
-  BookOpen, Wallet, Music, Apple, GraduationCap, LogOut,
-  Menu, X, Moon, Sun, ChevronLeft, ChevronRight
+  BookOpen, Wallet, Music, Apple, GraduationCap, Settings,
+  Menu, X, Moon, Sun, ChevronLeft, ChevronRight, Lock
 } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const lock = useLockStore()
 const mobileOpen = ref(false)
 const collapsed = ref(localStorage.getItem('sidebar-collapsed') === 'true')
 const dark = ref(document.documentElement.classList.contains('dark'))
@@ -26,11 +29,6 @@ function toggleCollapse() {
   localStorage.setItem('sidebar-collapsed', String(collapsed.value))
 }
 
-function logout() {
-  auth.logout()
-  router.push('/login')
-}
-
 const navItems = [
   { to: '/journal', label: 'Дневник', icon: BookOpen },
   { to: '/finance', label: 'Финансы', icon: Wallet },
@@ -38,10 +36,16 @@ const navItems = [
   { to: '/diet', label: 'Диета', icon: Apple },
   { to: '/study', label: 'Учёба', icon: GraduationCap },
 ]
+
+onMounted(() => {
+  if (auth.isAuthenticated) lock.setupActivity()
+})
 </script>
 
 <template>
   <div class="flex h-screen bg-background overflow-hidden">
+    <LockScreen />
+
     <!-- Mobile overlay -->
     <div v-if="mobileOpen" class="fixed inset-0 z-20 bg-black/50 lg:hidden" @click="mobileOpen = false" />
 
@@ -66,7 +70,7 @@ const navItems = [
       </div>
 
       <!-- Nav -->
-      <nav class="flex-1 p-2 space-y-0.5">
+      <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto">
         <RouterLink
           v-for="item in navItems"
           :key="item.to"
@@ -90,6 +94,31 @@ const navItems = [
       <div class="p-2 border-t space-y-0.5">
         <div v-if="!collapsed" class="px-2.5 py-1.5 text-xs text-muted-foreground truncate">{{ auth.username }}</div>
 
+        <!-- Lock -->
+        <button v-if="lock.hasPin"
+          :title="collapsed ? 'Заблокировать' : undefined"
+          :class="['flex items-center gap-3 px-2.5 py-2 rounded-md text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground w-full transition-colors', collapsed ? 'justify-center' : '']"
+          @click="lock.lock()"
+        >
+          <Lock class="w-4 h-4 flex-shrink-0" />
+          <span v-if="!collapsed">Заблокировать</span>
+        </button>
+
+        <!-- Settings -->
+        <RouterLink to="/settings" @click="mobileOpen = false"
+          :title="collapsed ? 'Настройки' : undefined"
+          :class="[
+            'flex items-center gap-3 px-2.5 py-2 rounded-md text-sm font-medium transition-colors',
+            collapsed ? 'justify-center' : '',
+            route.path === '/settings'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+          ]">
+          <Settings class="w-4 h-4 flex-shrink-0" />
+          <span v-if="!collapsed">Настройки</span>
+        </RouterLink>
+
+        <!-- Theme -->
         <button
           :title="collapsed ? (dark ? 'Светлая тема' : 'Тёмная тема') : undefined"
           :class="['flex items-center gap-3 px-2.5 py-2 rounded-md text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground w-full transition-colors', collapsed ? 'justify-center' : '']"
@@ -98,15 +127,6 @@ const navItems = [
           <Moon v-if="!dark" class="w-4 h-4 flex-shrink-0" />
           <Sun v-else class="w-4 h-4 flex-shrink-0" />
           <span v-if="!collapsed">{{ dark ? 'Светлая тема' : 'Тёмная тема' }}</span>
-        </button>
-
-        <button
-          title="Выйти"
-          :class="['flex items-center gap-3 px-2.5 py-2 rounded-md text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-full transition-colors', collapsed ? 'justify-center' : '']"
-          @click="logout"
-        >
-          <LogOut class="w-4 h-4 flex-shrink-0" />
-          <span v-if="!collapsed">Выйти</span>
         </button>
       </div>
     </aside>

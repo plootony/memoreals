@@ -10,6 +10,7 @@ import financeRoutes from './routes/finance.js'
 import musicRoutes from './routes/music.js'
 import dietRoutes from './routes/diet.js'
 import studyRoutes from './routes/study.js'
+import settingsRoutes from './routes/settings.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = process.env.PORT || 3001
@@ -26,6 +27,7 @@ app.use('/api/finance', financeRoutes)
 app.use('/api/music', musicRoutes)
 app.use('/api/diet', dietRoutes)
 app.use('/api/study', studyRoutes)
+app.use('/api/settings', settingsRoutes)
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
