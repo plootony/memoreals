@@ -1,0 +1,293 @@
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+import { usePlayerStore } from '@/stores/player'
+import api from '@/api'
+import Button from '@/components/ui/Button.vue'
+import Card from '@/components/ui/Card.vue'
+import Input from '@/components/ui/Input.vue'
+import {
+  Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
+  Volume2, VolumeX, Upload, Trash2, Music, Plus, ListPlus,
+  Pencil, Check, X, ImagePlus, ListX
+} from 'lucide-vue-next'
+
+const player = usePlayerStore()
+
+// Playlist management
+const showNewPlaylist = ref(false)
+const newPlaylistName = ref('')
+const editingPlaylistId = ref<string | null>(null)
+const editingPlaylistName = ref('')
+
+// Track cover / edit
+const editingTrackId = ref<string | null>(null)
+const coverInputRef = ref<HTMLInputElement | null>(null)
+
+// Upload
+const uploading = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+// Playlist dropdown
+const playlistMenuTrackId = ref<string | null>(null)
+
+function formatTime(s: number) {
+  if (!s || isNaN(s)) return '0:00'
+  return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+}
+
+function onSeek(e: Event) {
+  player.seek(Number((e.target as HTMLInputElement).value))
+}
+
+function toggleMute() {
+  player.setVolume(player.volume > 0 ? 0 : 1)
+}
+
+function togglePlaylistMenu(trackId: string) {
+  playlistMenuTrackId.value = playlistMenuTrackId.value === trackId ? null : trackId
+}
+
+function closePlaylistMenu() { playlistMenuTrackId.value = null }
+
+// Upload MP3
+async function uploadFile(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  uploading.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('title', file.name.replace(/\.mp3$/i, ''))
+    const { useAuthStore } = await import('@/stores/auth')
+    const store = useAuthStore()
+    await api.post('/music/tracks', form, {
+      headers: { 'Content-Type': 'multipart/form-data', codeword: store.codeword! }
+    })
+    await player.load()
+  } finally {
+    uploading.value = false
+    ;(e.target as HTMLInputElement).value = ''
+  }
+}
+
+// Cover image
+function pickCover(trackId: string) {
+  editingTrackId.value = trackId
+  coverInputRef.value?.click()
+}
+
+async function onCoverSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file || !editingTrackId.value) return
+  const reader = new FileReader()
+  reader.onload = async () => {
+    await player.updateTrack(editingTrackId.value!, { cover: reader.result as string })
+    editingTrackId.value = null
+  }
+  reader.readAsDataURL(file)
+  ;(e.target as HTMLInputElement).value = ''
+}
+
+async function removeCover(trackId: string) {
+  await player.updateTrack(trackId, { cover: '' })
+}
+
+// Playlist crud
+async function createPlaylist() {
+  if (!newPlaylistName.value.trim()) return
+  await api.post('/music/playlists', { name: newPlaylistName.value, trackIds: [] })
+  showNewPlaylist.value = false
+  newPlaylistName.value = ''
+  await player.load()
+}
+
+function startRenamePlaylist(id: string, name: string) {
+  editingPlaylistId.value = id
+  editingPlaylistName.value = name
+}
+
+async function confirmRenamePlaylist() {
+  if (!editingPlaylistId.value || !editingPlaylistName.value.trim()) return
+  await player.renamePlaylist(editingPlaylistId.value, editingPlaylistName.value.trim())
+  editingPlaylistId.value = null
+}
+
+onMounted(() => {
+  player.load()
+  document.addEventListener('click', closePlaylistMenu)
+})
+onUnmounted(() => document.removeEventListener('click', closePlaylistMenu))
+</script>
+
+<template>
+  <div class="space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <h1 class="text-2xl font-bold">Плеер</h1>
+      <div class="flex gap-2 flex-wrap">
+        <Button variant="outline" size="sm" @click="showNewPlaylist = true"><Plus class="w-4 h-4 mr-1.5" />Плейлист</Button>
+        <Button size="sm" :disabled="uploading" @click="fileInputRef?.click()">
+          <Upload class="w-4 h-4 mr-1.5" />{{ uploading ? 'Загрузка...' : 'Добавить MP3' }}
+        </Button>
+        <input ref="fileInputRef" type="file" accept=".mp3,audio/mpeg" class="hidden" @change="uploadFile" />
+        <input ref="coverInputRef" type="file" accept="image/*" class="hidden" @change="onCoverSelected" />
+      </div>
+    </div>
+
+    <!-- Player card -->
+    <Card class="p-4 space-y-3" v-if="player.tracks.length > 0">
+      <!-- Cover -->
+      <div class="flex justify-center">
+        <div class="w-36 h-36 rounded-lg overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
+          <img v-if="player.currentTrack?.cover" :src="player.currentTrack.cover" class="w-full h-full object-cover" />
+          <Music v-else class="w-12 h-12 text-muted-foreground opacity-40" />
+        </div>
+      </div>
+
+      <div class="text-center">
+        <p class="font-semibold truncate">{{ player.currentTrack?.title || 'Нет трека' }}</p>
+        <p class="text-sm text-muted-foreground truncate">{{ player.currentTrack?.artist || '—' }}</p>
+      </div>
+
+      <!-- Progress -->
+      <div class="flex items-center gap-2 text-xs text-muted-foreground">
+        <span class="w-8 text-right">{{ formatTime(player.progress) }}</span>
+        <input type="range" :max="player.duration || 100" :value="player.progress" @input="onSeek" class="flex-1 h-1 accent-primary" />
+        <span class="w-8">{{ formatTime(player.duration) }}</span>
+      </div>
+
+      <!-- Buttons -->
+      <div class="flex items-center justify-center gap-3">
+        <button @click="player.shuffle = !player.shuffle" :class="['p-2 rounded', player.shuffle ? 'text-primary' : 'text-muted-foreground hover:text-foreground']"><Shuffle class="w-4 h-4" /></button>
+        <button @click="player.prev()" class="p-2 rounded hover:bg-accent"><SkipBack class="w-5 h-5" /></button>
+        <button @click="player.togglePlay()" class="p-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
+          <Play v-if="!player.isPlaying" class="w-5 h-5" /><Pause v-else class="w-5 h-5" />
+        </button>
+        <button @click="player.next()" class="p-2 rounded hover:bg-accent"><SkipForward class="w-5 h-5" /></button>
+        <button @click="player.repeat = !player.repeat" :class="['p-2 rounded', player.repeat ? 'text-primary' : 'text-muted-foreground hover:text-foreground']"><Repeat class="w-4 h-4" /></button>
+      </div>
+
+      <!-- Volume -->
+      <div class="flex items-center gap-2">
+        <button @click="toggleMute()" class="text-muted-foreground hover:text-foreground">
+          <VolumeX v-if="player.volume === 0" class="w-4 h-4" /><Volume2 v-else class="w-4 h-4" />
+        </button>
+        <input type="range" min="0" max="1" step="0.01" :value="player.volume"
+          @input="player.setVolume(Number(($event.target as HTMLInputElement).value))"
+          class="flex-1 h-1 accent-primary" />
+      </div>
+    </Card>
+
+    <!-- Playlist tabs -->
+    <div v-if="player.playlists.length || player.tracks.length" class="space-y-2">
+      <div class="flex gap-2 flex-wrap items-center">
+        <Button :variant="player.activePlaylist === null ? 'default' : 'outline'" size="sm"
+          @click="player.activePlaylist = null">
+          Все треки ({{ player.tracks.length }})
+        </Button>
+
+        <div v-for="pl in player.playlists" :key="pl.id" class="flex items-center gap-1">
+          <!-- Rename inline -->
+          <template v-if="editingPlaylistId === pl.id">
+            <Input v-model="editingPlaylistName" class="h-8 text-sm w-32"
+              @keyup.enter="confirmRenamePlaylist" @keyup.escape="editingPlaylistId = null" />
+            <button @click="confirmRenamePlaylist" class="p-1 text-primary hover:text-primary/80"><Check class="w-3.5 h-3.5" /></button>
+            <button @click="editingPlaylistId = null" class="p-1 text-muted-foreground hover:text-foreground"><X class="w-3.5 h-3.5" /></button>
+          </template>
+          <template v-else>
+            <Button :variant="player.activePlaylist?.id === pl.id ? 'default' : 'outline'" size="sm"
+              @click="player.activePlaylist = pl">
+              {{ pl.name }} ({{ pl.trackIds.length }})
+            </Button>
+            <button @click.stop="startRenamePlaylist(pl.id, pl.name)"
+              class="p-1 text-muted-foreground hover:text-foreground"><Pencil class="w-3 h-3" /></button>
+            <button @click.stop="player.deletePlaylist(pl.id)"
+              class="p-1 text-muted-foreground hover:text-destructive"><Trash2 class="w-3 h-3" /></button>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Track list -->
+    <div class="space-y-1" @click.self="closePlaylistMenu">
+      <div v-for="(track, idx) in player.queue" :key="track.id"
+        :class="['flex items-center gap-3 p-2 rounded-md transition-colors group', player.currentTrack?.id === track.id ? 'bg-primary/10' : 'hover:bg-accent']"
+      >
+        <!-- Cover thumbnail -->
+        <div class="w-10 h-10 rounded overflow-hidden bg-muted flex items-center justify-center flex-shrink-0 cursor-pointer"
+          @click="player.play(track, idx)">
+          <img v-if="track.cover" :src="track.cover" class="w-full h-full object-cover" />
+          <Music v-else class="w-4 h-4 text-muted-foreground" />
+        </div>
+
+        <!-- Title/artist -->
+        <div class="flex-1 min-w-0 cursor-pointer" @click="player.play(track, idx)">
+          <p class="text-sm font-medium truncate" :class="{ 'text-primary': player.currentTrack?.id === track.id }">{{ track.title }}</p>
+          <p class="text-xs text-muted-foreground truncate">{{ track.artist || '—' }}</p>
+        </div>
+
+        <!-- Playing indicator -->
+        <Pause v-if="player.currentTrack?.id === track.id && player.isPlaying" class="w-4 h-4 text-primary flex-shrink-0" />
+
+        <!-- Actions -->
+        <div class="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <!-- Set cover -->
+          <button class="p-1.5 rounded hover:bg-background text-muted-foreground hover:text-foreground" @click.stop="pickCover(track.id)" title="Обложка">
+            <ImagePlus class="w-3.5 h-3.5" />
+          </button>
+          <!-- Remove cover -->
+          <button v-if="track.cover" class="p-1.5 rounded hover:bg-background text-muted-foreground hover:text-foreground" @click.stop="removeCover(track.id)" title="Убрать обложку">
+            <X class="w-3.5 h-3.5" />
+          </button>
+
+          <!-- Add to playlist -->
+          <div v-if="player.playlists.length" class="relative">
+            <button class="p-1.5 rounded hover:bg-background text-muted-foreground hover:text-foreground" @click.stop="togglePlaylistMenu(track.id)" title="В плейлист">
+              <ListPlus class="w-3.5 h-3.5" />
+            </button>
+            <div v-if="playlistMenuTrackId === track.id"
+              class="absolute right-0 top-8 z-10 min-w-[180px] rounded-md border bg-card shadow-md py-1">
+              <p class="px-3 py-1 text-xs text-muted-foreground font-medium">Добавить в плейлист</p>
+              <button v-for="pl in player.playlists" :key="pl.id"
+                class="w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex items-center justify-between gap-2"
+                @click.stop="player.addToPlaylist(pl.id, track.id); closePlaylistMenu()">
+                <span class="truncate">{{ pl.name }}</span>
+                <span v-if="pl.trackIds.includes(track.id)" class="text-xs text-primary flex-shrink-0">✓</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Remove from current playlist -->
+          <button v-if="player.activePlaylist"
+            class="p-1.5 rounded hover:bg-background text-muted-foreground hover:text-destructive"
+            @click.stop="player.removeFromPlaylist(player.activePlaylist!.id, track.id)"
+            title="Убрать из плейлиста">
+            <ListX class="w-3.5 h-3.5" />
+          </button>
+
+          <!-- Delete track -->
+          <button class="p-1.5 rounded hover:bg-background text-muted-foreground hover:text-destructive"
+            @click.stop="player.deleteTrack(track.id)" title="Удалить трек">
+            <Trash2 class="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <p v-if="player.queue.length === 0" class="text-sm text-muted-foreground text-center py-8">
+        {{ player.activePlaylist ? 'Плейлист пуст. Добавьте треки через кнопку ⊕.' : 'Нет треков. Загрузите MP3.' }}
+      </p>
+    </div>
+
+    <!-- New playlist modal -->
+    <div v-if="showNewPlaylist" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card class="w-full max-w-sm p-6 space-y-4">
+        <h2 class="font-semibold text-lg">Новый плейлист</h2>
+        <Input v-model="newPlaylistName" placeholder="Название плейлиста" @keyup.enter="createPlaylist" />
+        <div class="flex gap-2">
+          <Button variant="outline" class="flex-1" @click="showNewPlaylist = false">Отмена</Button>
+          <Button class="flex-1" @click="createPlaylist" :disabled="!newPlaylistName.trim()">Создать</Button>
+        </div>
+      </Card>
+    </div>
+  </div>
+</template>

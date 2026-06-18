@@ -1,0 +1,17 @@
+node_modules/
+client/node_modules/
+server/node_modules/
+client/dist/
+
+# Данные пользователя — только на сервере, не в репозитории
+server/data/
+server/uploads/
+
+# Окружение
+.env
+.env.local
+*.local
+
+# Системное
+.DS_Store
+*.log
