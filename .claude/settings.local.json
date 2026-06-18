@@ -8,7 +8,21 @@
       "Bash(git init *)",
       "Bash(git remote *)",
       "Bash(git branch *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(ssh -T git@github.com)",
+      "Bash(git config *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(sudo apt-get install -y sshpass)",
+      "Bash(ssh-keygen -t ed25519 -f ~/.ssh/id_vps -N \"\")",
+      "Read(//home/boo/.ssh/**)",
+      "Bash(pip3 install *)",
+      "Bash(python3 -m pip install paramiko)",
+      "Bash(node -e ' *)",
+      "Bash(cat /tmp/sshtool/node_modules/node-ssh/package.json | grep '\"main\"\\\\|\"exports\"' | head -5)",
+      "Read(//tmp/sshtool/node_modules/node-ssh/**)",
+      "Bash(node -e *)",
+      "Bash(npx vue-tsc *)"
     ]
   }
 }
