@@ -1,1 +1,0 @@
-import{c as r}from"./utils-CdbW2dVE.js";import{d as e,c as o,n as a,k as n,D as c,o as t}from"./index-DKNOrVEr.js";const f=e({__name:"Card",props:{class:{}},setup(d){return(s,l)=>(t(),o("div",{class:a(n(r)("rounded-lg border bg-card text-card-foreground shadow-sm",s.$props.class))},[c(s.$slots,"default")],2))}});export{f as _};

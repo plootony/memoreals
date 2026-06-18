@@ -284,15 +284,20 @@ onMounted(loadAll)
 
     <!-- History -->
     <div v-if="tab === 'history'" class="space-y-3">
-      <div class="flex gap-2 flex-wrap">
-        <div class="relative"><Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input v-model="searchTx" placeholder="Поиск..." class="pl-9 w-48" @input="loadAll" /></div>
-        <select v-model="filterType" @change="loadAll" class="h-10 rounded-md border border-input bg-background px-2 text-sm">
-          <option value="">Все</option><option value="income">Доходы</option><option value="expense">Расходы</option>
-        </select>
-        <select v-model="filterCategory" @change="loadAll" class="h-10 rounded-md border border-input bg-background px-2 text-sm">
-          <option value="">Все категории</option>
-          <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.icon }} {{ c.name }}</option>
-        </select>
+      <div class="space-y-2">
+        <div class="relative">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input v-model="searchTx" placeholder="Поиск..." class="pl-9 w-full" @input="loadAll" />
+        </div>
+        <div class="flex gap-2">
+          <select v-model="filterType" @change="loadAll" class="flex-1 h-10 rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">Все</option><option value="income">Доходы</option><option value="expense">Расходы</option>
+          </select>
+          <select v-model="filterCategory" @change="loadAll" class="flex-1 h-10 rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">Все категории</option>
+            <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.icon }} {{ c.name }}</option>
+          </select>
+        </div>
       </div>
 
       <div class="space-y-2">
