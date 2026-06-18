@@ -9,7 +9,6 @@ import { formatDate } from '@/lib/utils'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Card from '@/components/ui/Card.vue'
-import Badge from '@/components/ui/Badge.vue'
 import { Plus, Search, ChevronLeft, Trash2, Bold, Italic, List, ListOrdered, Image as ImageIcon, BookOpen } from 'lucide-vue-next'
 
 interface JournalEntry {

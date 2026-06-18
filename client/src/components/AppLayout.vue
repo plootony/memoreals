@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useLockStore } from '@/stores/lock'
 import MiniPlayer from '@/components/MiniPlayer.vue'
@@ -10,7 +10,6 @@ import {
   Menu, X, Moon, Sun, ChevronLeft, ChevronRight, Lock
 } from 'lucide-vue-next'
 
-const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const lock = useLockStore()
