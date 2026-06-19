@@ -47,7 +47,12 @@ router.get('/', async (req, res) => {
       .slice(0, 5)
       .map(t => ({ id: t.id, title: t.description, subtitle: `${t.type === 'income' ? '+' : '−'}${t.amount} ₽`, section: 'finance' }))
 
-    res.json({ journal, plans, study, finance })
+    const wishlist = (data.wishlist?.items || [])
+      .filter(i => i.title.toLowerCase().includes(query) || i.note?.toLowerCase().includes(query))
+      .slice(0, 5)
+      .map(i => ({ id: i.id, title: i.title, subtitle: i.price ? `${i.price.toLocaleString('ru')} ₽` : i.category, section: 'wishlist' }))
+
+    res.json({ journal, plans, study, finance, wishlist })
   } catch (e) {
     if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
     res.status(500).json({ error: e.message })

@@ -13,6 +13,7 @@ import studyRoutes from './routes/study.js'
 import settingsRoutes from './routes/settings.js'
 import imagesRoutes from './routes/images.js'
 import plansRoutes from './routes/plans.js'
+import wishlistRoutes from './routes/wishlist.js'
 import searchRoutes from './routes/search.js'
 import exportRoutes from './routes/export.js'
 
@@ -34,6 +35,7 @@ app.use('/api/study', studyRoutes)
 app.use('/api/settings', settingsRoutes)
 app.use('/api/images', imagesRoutes)
 app.use('/api/plans', plansRoutes)
+app.use('/api/wishlist', wishlistRoutes)
 app.use('/api/search', searchRoutes)
 app.use('/api/export', exportRoutes)
 

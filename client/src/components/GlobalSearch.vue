@@ -2,7 +2,7 @@
 import { ref, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
-import { Search, BookOpen, ListTodo, GraduationCap, Wallet, X, Loader2 } from 'lucide-vue-next'
+import { Search, BookOpen, ListTodo, GraduationCap, Wallet, X, Loader2, Gift } from 'lucide-vue-next'
 
 const emit = defineEmits(['close'])
 const router = useRouter()
@@ -11,14 +11,15 @@ const query = ref('')
 const loading = ref(false)
 const inputRef = ref<HTMLInputElement>()
 const results = ref<Record<string, { id: string; title: string; subtitle: string; section: string }[]>>({
-  journal: [], plans: [], study: [], finance: []
+  journal: [], plans: [], study: [], finance: [], wishlist: []
 })
 
 const sectionMeta: Record<string, { label: string; icon: any; route: string; color: string }> = {
-  journal: { label: 'Дневник',  icon: BookOpen,      route: '/journal', color: 'text-blue-500' },
-  plans:   { label: 'Планы',    icon: ListTodo,       route: '/plans',   color: 'text-violet-500' },
-  study:   { label: 'Учёба',    icon: GraduationCap,  route: '/study',   color: 'text-green-500' },
-  finance: { label: 'Финансы',  icon: Wallet,         route: '/finance', color: 'text-orange-500' },
+  journal:  { label: 'Дневник',  icon: BookOpen,     route: '/journal',  color: 'text-blue-500' },
+  plans:    { label: 'Планы',    icon: ListTodo,      route: '/plans',    color: 'text-violet-500' },
+  study:    { label: 'Учёба',    icon: GraduationCap, route: '/study',    color: 'text-green-500' },
+  finance:  { label: 'Финансы',  icon: Wallet,        route: '/finance',  color: 'text-orange-500' },
+  wishlist: { label: 'Вишлист',  icon: Gift,          route: '/wishlist', color: 'text-pink-500' },
 }
 
 const hasResults = () => Object.values(results.value).some(r => r.length > 0)
@@ -26,7 +27,7 @@ const hasResults = () => Object.values(results.value).some(r => r.length > 0)
 let searchTimer: any
 watch(query, v => {
   clearTimeout(searchTimer)
-  if (!v.trim()) { results.value = { journal: [], plans: [], study: [], finance: [] }; return }
+  if (!v.trim()) { results.value = { journal: [], plans: [], study: [], finance: [], wishlist: [] }; return }
   searchTimer = setTimeout(async () => {
     loading.value = true
     try {
