@@ -491,11 +491,29 @@ async function saveGoals() {
           </div>
         </div>
 
-        <div class="flex gap-3">
-          <div class="flex-1 space-y-1">
-            <Label>Граммовка</Label>
-            <Input v-model.number="addGrams" type="number" min="1" />
+        <div class="space-y-2">
+          <Label>Граммовка</Label>
+          <!-- Быстрые пресеты -->
+          <div class="flex flex-wrap gap-1.5">
+            <button v-for="g in [25, 50, 75, 100, 125, 150, 200, 250]" :key="g"
+              :class="['px-2.5 py-1 rounded-md text-xs font-medium border transition-colors',
+                addGrams === g
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-muted text-muted-foreground border-transparent hover:border-border']"
+              @click="addGrams = g">
+              {{ g }}г
+            </button>
           </div>
+          <!-- Точный счётчик -->
+          <div class="flex items-center gap-2">
+            <button class="w-9 h-9 rounded-md border flex items-center justify-center text-lg hover:bg-accent transition-colors"
+              @click="addGrams = Math.max(25, addGrams - 25)">−</button>
+            <Input v-model.number="addGrams" type="number" min="25" step="25" class="flex-1 text-center" />
+            <button class="w-9 h-9 rounded-md border flex items-center justify-center text-lg hover:bg-accent transition-colors"
+              @click="addGrams = addGrams + 25">+</button>
+          </div>
+        </div>
+        <div class="flex gap-3">
           <div class="flex-1 space-y-1">
             <Label>Приём пищи</Label>
             <select v-model="addMeal" class="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
