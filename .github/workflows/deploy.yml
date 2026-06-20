@@ -18,7 +18,8 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             cd /root/memoreals
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             npm install --workspace=server --omit=dev
             pm2 restart memoreals
             echo "✅ Deploy done at $(date)"
