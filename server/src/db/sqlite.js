@@ -276,11 +276,13 @@ db.exec(`
 
   -- ── Gallery ──────────────────────────────────────────────────────────────────
   CREATE TABLE IF NOT EXISTS photo_albums (
-    id         TEXT PRIMARY KEY,
-    user_id    TEXT NOT NULL,
-    name       TEXT NOT NULL,
-    is_system  INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL,
+    name           TEXT NOT NULL,
+    is_system      INTEGER NOT NULL DEFAULT 0,
+    cover_photo_id TEXT,
+    description    TEXT NOT NULL DEFAULT '',
+    created_at     TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS photos (
     id         TEXT PRIMARY KEY,
@@ -292,5 +294,13 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_photos_user_album ON photos(user_id, album_id);
 `)
+
+// Migrations for existing databases
+for (const sql of [
+  'ALTER TABLE photo_albums ADD COLUMN cover_photo_id TEXT',
+  "ALTER TABLE photo_albums ADD COLUMN description TEXT NOT NULL DEFAULT ''",
+]) {
+  try { db.exec(sql) } catch {}
+}
 
 export default db

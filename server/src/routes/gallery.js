@@ -36,10 +36,24 @@ router.get('/', (req, res) => {
   const uid = req.user.userId
   const albums = db.prepare('SELECT * FROM photo_albums WHERE user_id = ? ORDER BY is_system DESC, created_at').all(uid)
   const photos = db.prepare('SELECT * FROM photos WHERE user_id = ? ORDER BY created_at DESC').all(uid)
-  res.json({
-    albums: albums.map(a => ({ id: a.id, name: a.name, isSystem: !!a.is_system, count: photos.filter(p => p.album_id === a.id).length })),
-    photos: photos.map(rowToPhoto),
+
+  const albumsWithCover = albums.map(a => {
+    const albumPhotos = photos.filter(p => p.album_id === a.id)
+    // Cover: explicit cover_photo_id or first (oldest) photo in album
+    const coverPhoto = a.cover_photo_id
+      ? photos.find(p => p.id === a.cover_photo_id)
+      : albumPhotos.at(-1)
+    return {
+      id: a.id,
+      name: a.name,
+      description: a.description || '',
+      isSystem: !!a.is_system,
+      count: albumPhotos.length,
+      coverUrl: coverPhoto?.url || null,
+    }
   })
+
+  res.json({ albums: albumsWithCover, photos: photos.map(rowToPhoto) })
 })
 
 // POST /api/gallery — загрузить фото в галерею
@@ -125,12 +139,15 @@ router.post('/albums', (req, res) => {
   res.json({ id: album.id, name: album.name, isSystem: false, count: 0 })
 })
 
-// PATCH /api/gallery/albums/:id — переименовать альбом
+// PATCH /api/gallery/albums/:id — обновить альбом (name, description, cover_photo_id)
 router.patch('/albums/:id', (req, res) => {
   const album = db.prepare('SELECT * FROM photo_albums WHERE id = ? AND user_id = ?').get(req.params.id, req.user.userId)
   if (!album) return res.status(404).json({ error: 'Not found' })
-  if (album.is_system) return res.status(403).json({ error: 'Cannot rename system album' })
-  db.prepare('UPDATE photo_albums SET name = ? WHERE id = ?').run(req.body.name, album.id)
+  if (req.body.name !== undefined && album.is_system) return res.status(403).json({ error: 'Cannot rename system album' })
+  const name = req.body.name ?? album.name
+  const description = req.body.description ?? album.description ?? ''
+  const cover_photo_id = req.body.cover_photo_id !== undefined ? (req.body.cover_photo_id || null) : album.cover_photo_id
+  db.prepare('UPDATE photo_albums SET name = ?, description = ?, cover_photo_id = ? WHERE id = ?').run(name, description, cover_photo_id, album.id)
   res.json({ ok: true })
 })
 
