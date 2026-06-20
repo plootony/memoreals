@@ -18,6 +18,7 @@ import searchRoutes from './routes/search.js'
 import exportRoutes from './routes/export.js'
 import backupRoutes from './routes/backup.js'
 import galleryRoutes from './routes/gallery.js'
+import versionRoutes from './routes/version.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = process.env.PORT || 3001
@@ -42,6 +43,7 @@ app.use('/api/search', searchRoutes)
 app.use('/api/export', exportRoutes)
 app.use('/api/backup', backupRoutes)
 app.use('/api/gallery', galleryRoutes)
+app.use('/api/version', versionRoutes)
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 

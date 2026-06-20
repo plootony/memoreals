@@ -8,7 +8,7 @@ import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Button from '@/components/ui/Button.vue'
 import Label from '@/components/ui/Label.vue'
-import { Lock, User, Key, Shield, LogOut, Download, Loader2, Database, RotateCcw, Plus, Trash2 } from 'lucide-vue-next'
+import { Lock, User, Key, Shield, LogOut, Download, Loader2, Database, RotateCcw, Plus, Trash2, Info } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const lock = useLockStore()
@@ -124,6 +124,10 @@ function logout() {
 // ── Backup ────────────────────────────────────────────────────────────────────
 interface Backup { key: string; name: string; size: number; date: string }
 
+// ── App version ───────────────────────────────────────────────────────────────
+const appVersion = ref<{ version: string; buildDate: string | null; commit: string | null }>({ version: '…', buildDate: null, commit: null })
+api.get('/version').then(r => appVersion.value = r.data).catch(() => {})
+
 const backups = ref<Backup[]>([])
 const backupLoading = ref(false)
 const backupCreating = ref(false)
@@ -182,6 +186,28 @@ onMounted(loadBackups)
 <template>
   <div class="max-w-xl space-y-6">
     <h1 class="text-2xl font-bold">Настройки</h1>
+
+    <!-- About -->
+    <Card class="p-5 space-y-3">
+      <div class="flex items-center gap-2">
+        <Info class="w-4 h-4 text-muted-foreground" />
+        <h2 class="font-semibold">О программе</h2>
+      </div>
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-muted-foreground">Версия</span>
+          <span class="font-mono font-bold text-primary">v{{ appVersion.version }}</span>
+        </div>
+        <div v-if="appVersion.buildDate" class="flex items-center justify-between">
+          <span class="text-sm text-muted-foreground">Сборка</span>
+          <span class="text-sm">{{ new Date(appVersion.buildDate).toLocaleString('ru', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }}</span>
+        </div>
+        <div v-if="appVersion.commit" class="flex items-center justify-between">
+          <span class="text-sm text-muted-foreground">Коммит</span>
+          <span class="font-mono text-xs text-muted-foreground">{{ appVersion.commit }}</span>
+        </div>
+      </div>
+    </Card>
 
     <!-- Username -->
     <Card class="p-5 space-y-4">
