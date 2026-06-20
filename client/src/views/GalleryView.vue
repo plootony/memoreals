@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import api from '@/api'
 import Button from '@/components/ui/Button.vue'
-import { Plus, X, ChevronLeft, ChevronRight, ImagePlus, Trash2, FolderInput } from 'lucide-vue-next'
+import { Plus, X, ChevronLeft, ChevronRight, ImagePlus, Trash2, FolderInput, Pencil } from 'lucide-vue-next'
 
 interface Album { id: string; name: string; isSystem: boolean; count: number }
 interface Photo { id: string; url: string; albumId: string; note: string; createdAt: string }
@@ -19,6 +19,10 @@ const fileInput = ref<HTMLInputElement | null>(null)
 // Album creation
 const newAlbumName = ref('')
 const showNewAlbum = ref(false)
+
+// Album editing
+const editingAlbum = ref<Album | null>(null)
+const editAlbumName = ref('')
 
 // Upload album picker
 const pendingFiles = ref<File[]>([])
@@ -47,13 +51,38 @@ async function createAlbum() {
   showNewAlbum.value = false
 }
 
+function startEditAlbum(a: Album) {
+  editingAlbum.value = a
+  editAlbumName.value = a.name
+}
+
+async function saveAlbumName() {
+  if (!editingAlbum.value || !editAlbumName.value.trim()) return
+  await api.patch(`/gallery/albums/${editingAlbum.value.id}`, { name: editAlbumName.value.trim() })
+  const idx = albums.value.findIndex(a => a.id === editingAlbum.value!.id)
+  if (idx !== -1) albums.value[idx].name = editAlbumName.value.trim()
+  editingAlbum.value = null
+}
+
+async function deleteAlbum(a: Album) {
+  await api.delete(`/gallery/albums/${a.id}`)
+  albums.value = albums.value.filter(x => x.id !== a.id)
+  if (activeAlbum.value === a.id) activeAlbum.value = null
+  await load()
+  editingAlbum.value = null
+}
+
 // ── Upload ────────────────────────────────────────────────────────────────────
 function onFilesSelected(e: Event) {
   const files = Array.from((e.target as HTMLInputElement).files || []);
   (e.target as HTMLInputElement).value = ''
   if (!files.length) return
   pendingFiles.value = files
+  // Pre-select active album, or first non-system album, or first album
   uploadAlbumId.value = activeAlbum.value
+    ?? albums.value.find(a => !a.isSystem)?.id
+    ?? albums.value[0]?.id
+    ?? null
   showUploadPicker.value = true
 }
 
@@ -183,11 +212,18 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <button :class="['px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex-shrink-0', activeAlbum === null ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent']" @click.stop="activeAlbum = null">
         Все <span class="ml-1 opacity-60">{{ photos.length }}</span>
       </button>
-      <button v-for="a in albums" :key="a.id"
-        :class="['px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex-shrink-0', activeAlbum === a.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent']"
-        @click.stop="activeAlbum = a.id">
-        {{ a.name }} <span class="ml-1 opacity-60">{{ a.count }}</span>
-      </button>
+      <div v-for="a in albums" :key="a.id" class="flex items-center gap-0.5 flex-shrink-0 group/chip">
+        <button
+          :class="['px-3 py-1.5 rounded-full text-sm font-medium transition-colors', activeAlbum === a.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent']"
+          @click.stop="activeAlbum = a.id">
+          {{ a.name }} <span class="ml-1 opacity-60">{{ a.count }}</span>
+        </button>
+        <button v-if="!a.isSystem"
+          class="p-1 rounded-full text-muted-foreground hover:text-foreground opacity-0 group-hover/chip:opacity-100 transition-opacity"
+          @click.stop="startEditAlbum(a)" title="Редактировать">
+          <Pencil class="w-3 h-3" />
+        </button>
+      </div>
       <div v-if="showNewAlbum" class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
         <input v-model="newAlbumName" placeholder="Название альбома"
           class="h-8 px-2.5 rounded-full border border-input bg-background text-sm w-40 focus:outline-none focus:ring-1 focus:ring-primary"
@@ -280,13 +316,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         <h2 class="font-semibold">В какой альбом?</h2>
         <span class="text-xs text-muted-foreground">{{ pendingFiles.length }} фото</span>
       </div>
-      <div class="space-y-1">
-        <button class="w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between"
-          :class="uploadAlbumId === null ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-accent'"
-          @click="uploadAlbumId = null">
-          Без категории
-          <span v-if="uploadAlbumId === null" class="text-primary">✓</span>
-        </button>
+      <div class="space-y-1 max-h-60 overflow-y-auto">
         <button v-for="a in albums" :key="a.id"
           class="w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between"
           :class="uploadAlbumId === a.id ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-accent'"
@@ -294,10 +324,30 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
           {{ a.name }}
           <span v-if="uploadAlbumId === a.id" class="text-primary">✓</span>
         </button>
+        <p v-if="albums.length === 0" class="text-sm text-muted-foreground px-3 py-2">Нет альбомов — создайте первый</p>
       </div>
       <div class="flex gap-2 pt-1">
         <Button variant="outline" class="flex-1" @click="showUploadPicker = false; pendingFiles = []">Отмена</Button>
         <Button class="flex-1" @click="confirmUpload">Загрузить</Button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit album modal -->
+  <div v-if="editingAlbum" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div class="bg-card rounded-xl p-5 w-full max-w-sm space-y-4 border">
+      <h2 class="font-semibold">Редактировать альбом</h2>
+      <input v-model="editAlbumName"
+        class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+        @keyup.enter="saveAlbumName" autofocus />
+      <div class="flex gap-2">
+        <Button variant="outline" size="sm" class="text-destructive hover:text-destructive flex-shrink-0"
+          @click="deleteAlbum(editingAlbum!)">
+          <Trash2 class="w-3.5 h-3.5 mr-1.5" />Удалить альбом
+        </Button>
+        <div class="flex-1" />
+        <Button variant="outline" @click="editingAlbum = null">Отмена</Button>
+        <Button @click="saveAlbumName" :disabled="!editAlbumName.trim()">Сохранить</Button>
       </div>
     </div>
   </div>

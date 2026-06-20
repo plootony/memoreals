@@ -125,6 +125,38 @@ router.post('/albums', (req, res) => {
   res.json({ id: album.id, name: album.name, isSystem: false, count: 0 })
 })
 
+// PATCH /api/gallery/albums/:id — переименовать альбом
+router.patch('/albums/:id', (req, res) => {
+  const album = db.prepare('SELECT * FROM photo_albums WHERE id = ? AND user_id = ?').get(req.params.id, req.user.userId)
+  if (!album) return res.status(404).json({ error: 'Not found' })
+  if (album.is_system) return res.status(403).json({ error: 'Cannot rename system album' })
+  db.prepare('UPDATE photo_albums SET name = ? WHERE id = ?').run(req.body.name, album.id)
+  res.json({ ok: true })
+})
+
+// DELETE /api/gallery/albums/:id — удалить альбом (фото переносятся в "Без категории")
+router.delete('/albums/:id', (req, res) => {
+  const uid = req.user.userId
+  const album = db.prepare('SELECT * FROM photo_albums WHERE id = ? AND user_id = ?').get(req.params.id, uid)
+  if (!album) return res.status(404).json({ error: 'Not found' })
+  if (album.is_system) return res.status(403).json({ error: 'Cannot delete system album' })
+
+  const count = db.prepare('SELECT COUNT(*) as n FROM photos WHERE album_id = ?').get(album.id).n
+
+  if (count > 0) {
+    // Перемещаем фото в "Без категории"
+    let nocat = db.prepare("SELECT id FROM photo_albums WHERE user_id = ? AND name = 'Без категории'").get(uid)
+    if (!nocat) {
+      nocat = { id: uuidv4() }
+      db.prepare('INSERT INTO photo_albums (id, user_id, name, is_system, created_at) VALUES (?,?,?,0,?)').run(nocat.id, uid, 'Без категории', new Date().toISOString())
+    }
+    db.prepare('UPDATE photos SET album_id = ? WHERE album_id = ?').run(nocat.id, album.id)
+  }
+
+  db.prepare('DELETE FROM photo_albums WHERE id = ?').run(album.id)
+  res.json({ ok: true, movedPhotos: count })
+})
+
 // Экспортируем хелпер для images.js
 export { ensureJournalAlbum }
 export default router
