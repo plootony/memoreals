@@ -1,39 +1,54 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
+import { persistCodeword, restoreCodewordSync, clearPersistedCodeword, PIN_KEY } from '@/lib/pinCrypto'
 
 const BASE = '/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('token'))
-  const codeword = ref<string | null>(sessionStorage.getItem('codeword'))
   const username = ref<string | null>(localStorage.getItem('username'))
 
+  // On startup: if token exists and no PIN set — restore codeword synchronously from localStorage
+  let initialCodeword = sessionStorage.getItem('codeword')
+  if (token.value && !initialCodeword && !localStorage.getItem(PIN_KEY)) {
+    initialCodeword = restoreCodewordSync()
+    if (initialCodeword) sessionStorage.setItem('codeword', initialCodeword)
+  }
+  const codeword = ref<string | null>(initialCodeword)
+
   const isAuthenticated = computed(() => !!token.value && !!codeword.value)
+  const needsCodeword = computed(() => !!token.value && !codeword.value)
 
   async function register(data: { username: string; password: string; codeword: string }) {
     const res = await axios.post(`${BASE}/auth/register`, data)
-    _setSession(res.data, data.codeword)
+    await _setSession(res.data, data.codeword)
   }
 
   async function login(data: { username: string; password: string; codeword: string }) {
     const res = await axios.post(`${BASE}/auth/login`, data)
-    _setSession(res.data, data.codeword)
+    await _setSession(res.data, data.codeword)
   }
 
-  function _setSession(data: { token: string; username: string; codeword?: string }, cw?: string) {
+  async function _setSession(data: { token: string; username: string }, cw: string) {
     token.value = data.token
     username.value = data.username
-    const cw2 = cw || (data as any).codeword
-    if (cw2) {
-      codeword.value = cw2
-      sessionStorage.setItem('codeword', cw2)
-    }
+    codeword.value = cw
+    sessionStorage.setItem('codeword', cw)
     localStorage.setItem('token', data.token)
     localStorage.setItem('username', data.username)
+    await persistCodeword(cw, localStorage.getItem(PIN_KEY) || null)
   }
 
-  function setCodeword(cw: string) {
+  // Called when user changes codeword in Settings — persists to localStorage
+  async function setCodeword(cw: string) {
+    codeword.value = cw
+    sessionStorage.setItem('codeword', cw)
+    await persistCodeword(cw, localStorage.getItem(PIN_KEY) || null)
+  }
+
+  // Called by lock store on PIN unlock — no re-persist needed, already stored
+  function restoreSession(cw: string) {
     codeword.value = cw
     sessionStorage.setItem('codeword', cw)
   }
@@ -45,7 +60,8 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('token')
     localStorage.removeItem('username')
     sessionStorage.removeItem('codeword')
+    clearPersistedCodeword()
   }
 
-  return { token, codeword, username, isAuthenticated, register, login, logout, setCodeword }
+  return { token, codeword, username, isAuthenticated, needsCodeword, register, login, logout, setCodeword, restoreSession }
 })

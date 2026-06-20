@@ -64,7 +64,7 @@ async function changeCodeword() {
   if (newCodeword.value !== newCodeword2.value) { codewordMsg.value = 'Кодовые слова не совпадают'; codewordError.value = true; return }
   try {
     await api.put('/settings/codeword', { newCodeword: newCodeword.value, password: codePassword.value })
-    auth.setCodeword(newCodeword.value)
+    await auth.setCodeword(newCodeword.value)
     codewordMsg.value = 'Кодовое слово изменено'; codewordError.value = false
     codePassword.value = ''; newCodeword.value = ''; newCodeword2.value = ''
   } catch (e: any) {
@@ -86,10 +86,10 @@ const timeoutOptions = [
   { label: '30 минут', value: 30 },
 ]
 
-function savePin() {
+async function savePin() {
   pinMsg.value = ''
   if (newPin.value && newPin.value !== newPin2.value) { pinMsg.value = 'Коды не совпадают'; pinError.value = true; return }
-  lock.setPin(newPin.value)
+  await lock.setPin(newPin.value)
   pinMsg.value = newPin.value ? 'Код сохранён' : 'Блокировка отключена'
   pinError.value = false
   newPin2.value = ''
