@@ -179,28 +179,28 @@ onMounted(load)
       </div>
     </div>
 
-    <!-- Tabs + filters -->
-    <div class="flex flex-wrap items-center gap-3">
-      <div class="flex border-b flex-1 min-w-0">
-        <button v-for="[v, l, count] in [['active','Активные',counts.active],['done','Выполненные',counts.done],['all','Все',data.tasks.length]]"
-          :key="v"
-          :class="['px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5',
-            tab === v ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground']"
-          @click="tab = v as any">
-          {{ l }}
-          <span :class="['text-xs px-1.5 py-0.5 rounded-full', tab === v ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground']">{{ count }}</span>
-        </button>
-      </div>
-      <div class="flex gap-2">
-        <select v-model="filterPriority" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
-          <option value="">Все приоритеты</option>
-          <option v-for="p in priorities" :key="p.value" :value="p.value">{{ p.label }}</option>
-        </select>
-        <select v-model="filterCategory" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
-          <option value="">Все категории</option>
-          <option v-for="c in data.categories" :key="c" :value="c">{{ c }}</option>
-        </select>
-      </div>
+    <!-- Tabs -->
+    <div class="flex border-b overflow-x-auto">
+      <button v-for="[v, l, count] in [['active','Активные',counts.active],['done','Выполненные',counts.done],['all','Все',data.tasks.length]]"
+        :key="v"
+        :class="['px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 flex-shrink-0',
+          tab === v ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground']"
+        @click="tab = v as any">
+        {{ l }}
+        <span :class="['text-xs px-1.5 py-0.5 rounded-full', tab === v ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground']">{{ count }}</span>
+      </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex gap-2">
+      <select v-model="filterPriority" class="flex-1 h-9 rounded-md border border-input bg-background px-2 text-sm min-w-0">
+        <option value="">Все приоритеты</option>
+        <option v-for="p in priorities" :key="p.value" :value="p.value">{{ p.label }}</option>
+      </select>
+      <select v-model="filterCategory" class="flex-1 h-9 rounded-md border border-input bg-background px-2 text-sm min-w-0">
+        <option value="">Все категории</option>
+        <option v-for="c in data.categories" :key="c" :value="c">{{ c }}</option>
+      </select>
     </div>
 
     <!-- Task list -->
