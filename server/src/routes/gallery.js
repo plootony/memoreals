@@ -108,6 +108,16 @@ router.delete('/:id', (req, res) => {
   res.json({ ok: true })
 })
 
+// PATCH /api/gallery/:id — перенести фото в другой альбом
+router.patch('/:id', (req, res) => {
+  const { albumId } = req.body
+  if (!albumId) return res.status(400).json({ error: 'albumId required' })
+  const photo = db.prepare('SELECT * FROM photos WHERE id = ? AND user_id = ?').get(req.params.id, req.user.userId)
+  if (!photo) return res.status(404).json({ error: 'Not found' })
+  db.prepare('UPDATE photos SET album_id = ? WHERE id = ?').run(albumId, photo.id)
+  res.json({ ok: true })
+})
+
 // POST /api/gallery/albums — создать альбом
 router.post('/albums', (req, res) => {
   const album = { id: uuidv4(), user_id: req.user.userId, name: req.body.name, is_system: 0, created_at: new Date().toISOString() }
