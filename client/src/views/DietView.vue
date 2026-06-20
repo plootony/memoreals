@@ -10,7 +10,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Card from '@/components/ui/Card.vue'
 import Label from '@/components/ui/Label.vue'
-import { Search, Plus, Trash2, Settings, Apple, ChefHat, X, Pencil, Scale } from 'lucide-vue-next'
+import { Search, Plus, Trash2, Settings, Apple, ChefHat, X, Pencil, Scale, Download } from 'lucide-vue-next'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
@@ -450,6 +450,31 @@ const measurementChartOptions = {
   scales: { y: { ticks: { callback: (v: any) => `${v} мм` } } },
 }
 
+// ── Export ────────────────────────────────────────────────────────────────────
+const showExport = ref(false)
+const exportMode = ref<'today' | 'day' | 'range' | 'all'>('all')
+const exportDate = ref(new Date().toISOString().slice(0, 10))
+const exportFrom = ref('')
+const exportTo   = ref(new Date().toISOString().slice(0, 10))
+
+function downloadExport() {
+  const params = new URLSearchParams()
+  if (exportMode.value === 'today') {
+    params.set('date', new Date().toISOString().slice(0, 10))
+  } else if (exportMode.value === 'day') {
+    params.set('date', exportDate.value)
+  } else if (exportMode.value === 'range') {
+    if (exportFrom.value) params.set('from', exportFrom.value)
+    if (exportTo.value)   params.set('to',   exportTo.value)
+  }
+  // all — no params
+  const url = `/api/diet/export?${params}`
+  const a = document.createElement('a')
+  a.href = url
+  a.click()
+  showExport.value = false
+}
+
 // ── Goals ──────────────────────────────────────────────────────────────────────
 async function saveGoals() {
   const r = await api.put('/diet/goals', goalsEdit.value)
@@ -465,6 +490,7 @@ async function saveGoals() {
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-bold">Питание</h1>
       <div class="flex gap-2">
+        <Button variant="outline" size="icon" @click="showExport = true" title="Экспорт дневника"><Download class="w-4 h-4" /></Button>
         <Button variant="outline" size="icon" @click="showGoals = true" title="Цели"><Settings class="w-4 h-4" /></Button>
         <input type="date" v-model="selectedDate"
           class="h-10 rounded-md border border-input bg-background px-3 text-sm" />
@@ -971,6 +997,56 @@ async function saveGoals() {
       <div class="flex gap-2">
         <Button variant="outline" class="flex-1" @click="showGoals = false">Отмена</Button>
         <Button class="flex-1" @click="saveGoals">Сохранить</Button>
+      </div>
+    </Card>
+  </div>
+
+  <!-- Export modal -->
+  <div v-if="showExport" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <Card class="w-full max-w-sm p-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-lg">Экспорт дневника питания</h2>
+        <button @click="showExport = false"><X class="w-4 h-4 text-muted-foreground" /></button>
+      </div>
+
+      <p class="text-xs text-muted-foreground">Формат JSON — удобен для анализа ИИ-агентами</p>
+
+      <!-- Period selector -->
+      <div class="space-y-2">
+        <Label class="text-xs">Период</Label>
+        <div class="grid grid-cols-2 gap-2">
+          <button v-for="[v, l] in [['today','Сегодня'],['day','Конкретный день'],['range','Промежуток'],['all','Всё']]" :key="v"
+            :class="['px-3 py-2 rounded-lg text-sm font-medium border transition-colors text-left',
+              exportMode === v ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-accent']"
+            @click="exportMode = v as any">
+            {{ l }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Day picker -->
+      <div v-if="exportMode === 'day'" class="space-y-1.5">
+        <Label class="text-xs">Дата</Label>
+        <input v-model="exportDate" type="date" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
+      </div>
+
+      <!-- Range picker -->
+      <div v-if="exportMode === 'range'" class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <Label class="text-xs">С</Label>
+          <input v-model="exportFrom" type="date" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
+        </div>
+        <div class="space-y-1.5">
+          <Label class="text-xs">По</Label>
+          <input v-model="exportTo" type="date" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <Button variant="outline" class="flex-1" @click="showExport = false">Отмена</Button>
+        <Button class="flex-1" @click="downloadExport">
+          <Download class="w-4 h-4 mr-2" />Скачать JSON
+        </Button>
       </div>
     </Card>
   </div>

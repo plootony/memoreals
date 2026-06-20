@@ -165,4 +165,74 @@ function rowToMeas(r) {
   return { id: r.id, date: r.date, note: r.note, createdAt: r.created_at, values: { waist: r.waist, chest: r.chest, hips: r.hips, leftArm: r.left_arm, rightArm: r.right_arm, leftThigh: r.left_thigh, rightThigh: r.right_thigh, neck: r.neck } }
 }
 
+// ── Diet export ───────────────────────────────────────────────────────────────
+router.get('/export', (req, res) => {
+  const uid = req.user.userId
+  const { from, to, date } = req.query
+
+  let rows = db.prepare('SELECT * FROM diet_log WHERE user_id = ? ORDER BY date, created_at').all(uid)
+  const goals = db.prepare('SELECT * FROM diet_goals WHERE user_id = ?').get(uid)
+    || { calories: 2000, protein: 150, fat: 65, carbs: 250 }
+
+  // Filter
+  if (date) {
+    rows = rows.filter(r => r.date === date)
+  } else {
+    if (from) rows = rows.filter(r => r.date >= from)
+    if (to)   rows = rows.filter(r => r.date <= to)
+  }
+
+  // Group by date
+  const byDate = {}
+  for (const r of rows) {
+    if (!byDate[r.date]) byDate[r.date] = []
+    byDate[r.date].push(r)
+  }
+
+  const mealLabels = { breakfast: 'Завтрак', lunch: 'Обед', dinner: 'Ужин', snack: 'Перекус', other: 'Другое' }
+
+  const days = Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).map(([d, entries]) => {
+    const totals = entries.reduce((acc, e) => ({
+      calories: acc.calories + e.calories,
+      protein:  Math.round((acc.protein  + e.protein)  * 10) / 10,
+      fat:      Math.round((acc.fat      + e.fat)      * 10) / 10,
+      carbs:    Math.round((acc.carbs    + e.carbs)    * 10) / 10,
+    }), { calories: 0, protein: 0, fat: 0, carbs: 0 })
+
+    const meals = {}
+    for (const e of entries) {
+      const key = mealLabels[e.meal] || e.meal
+      if (!meals[key]) meals[key] = []
+      meals[key].push({ name: e.name, grams: e.grams, calories: e.calories, protein: e.protein, fat: e.fat, carbs: e.carbs })
+    }
+
+    return { date: d, totals, vsGoals: { calories: Math.round(totals.calories / goals.calories * 100) + '%' }, meals }
+  })
+
+  // Summary
+  const n = days.length
+  const summary = n === 0 ? null : {
+    days: n,
+    avgCalories: Math.round(days.reduce((s, d) => s + d.totals.calories, 0) / n),
+    avgProtein:  Math.round(days.reduce((s, d) => s + d.totals.protein,  0) / n * 10) / 10,
+    avgFat:      Math.round(days.reduce((s, d) => s + d.totals.fat,      0) / n * 10) / 10,
+    avgCarbs:    Math.round(days.reduce((s, d) => s + d.totals.carbs,    0) / n * 10) / 10,
+    goalCalories: goals.calories,
+  }
+
+  const period = date
+    ? { type: 'day', date }
+    : { type: from || to ? 'range' : 'all', from: from || (days[0]?.date ?? null), to: to || (days.at(-1)?.date ?? null) }
+
+  const result = { exportedAt: new Date().toISOString(), period, goals: { calories: goals.calories, protein: goals.protein, fat: goals.fat, carbs: goals.carbs }, summary, days }
+
+  const filename = date
+    ? `diet-${date}.json`
+    : `diet-${period.from ?? 'all'}-to-${period.to ?? 'all'}.json`
+
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+  res.setHeader('Content-Type', 'application/json')
+  res.send(JSON.stringify(result, null, 2))
+})
+
 export default router
