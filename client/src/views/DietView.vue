@@ -22,7 +22,16 @@ interface LogEntry { id: string; name: string; grams: number; meal: string; date
 interface Goals { calories: number; protein: number; fat: number; carbs: number }
 
 // ── State ────────────────────────────────────────────────────────────────────
-const tab = ref<'log' | 'add' | 'products' | 'dishes' | 'weight' | 'measurements'>('log')
+const tab = ref<'log' | 'products' | 'dishes' | 'weight' | 'measurements'>('log')
+const showAddModal = ref(false)
+
+function openAddModal() {
+  addQuery.value = ''
+  addTarget.value = null
+  addGrams.value = 100
+  addMeal.value = 'other'
+  showAddModal.value = true
+}
 const selectedDate = ref(new Date().toISOString().slice(0, 10))
 
 const log = ref<LogEntry[]>([])
@@ -238,10 +247,10 @@ async function addToLog() {
     date: selectedDate.value
   })
   await api.get('/diet/log', { params: { date: selectedDate.value } }).then(r => log.value = r.data)
+  showAddModal.value = false
   addTarget.value = null
   addGrams.value = 100
   addQuery.value = ''
-  tab.value = 'log'
 }
 
 async function deleteEntry(id: string) {
@@ -485,7 +494,7 @@ async function saveGoals() {
 
     <!-- Tabs -->
     <div class="flex gap-0 border-b overflow-x-auto">
-      <button v-for="[v, l] in [['log','Дневник'],['add','Добавить'],['products','Продукты'],['dishes','Блюда'],['weight','Вес'],['measurements','Замеры']]" :key="v"
+      <button v-for="[v, l] in [['log','Дневник'],['products','Продукты'],['dishes','Блюда'],['weight','Вес'],['measurements','Замеры']]" :key="v"
         class="whitespace-nowrap flex-shrink-0"
         :class="['px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap', tab === v ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground']"
         @click="tab = v as any">{{ l }}</button>
@@ -493,6 +502,9 @@ async function saveGoals() {
 
     <!-- ── LOG ── -->
     <div v-if="tab === 'log'" class="space-y-4">
+      <div class="flex justify-end">
+        <Button @click="openAddModal"><Plus class="w-4 h-4 mr-2" />Добавить</Button>
+      </div>
       <div v-for="(entries, mealKey) in logByMeal" :key="mealKey">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{{ mealLabel(mealKey) }}</h3>
         <div class="space-y-1.5">
@@ -512,99 +524,10 @@ async function saveGoals() {
           </Card>
         </div>
       </div>
-      <p v-if="log.length === 0" class="text-sm text-muted-foreground text-center py-10">
-        Нет записей. Перейдите в «Добавить».
-      </p>
-    </div>
-
-    <!-- ── ADD ── -->
-    <div v-if="tab === 'add'" class="space-y-4">
-      <div v-if="!addTarget">
-        <div class="relative mb-3">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input v-model="addQuery" placeholder="Поиск продукта или блюда..." class="pl-9" />
-        </div>
-        <div class="space-y-1.5">
-          <template v-if="addQuery">
-            <div v-if="filteredAdd.length === 0" class="text-sm text-muted-foreground text-center py-6">Ничего не найдено</div>
-            <Card v-for="row in filteredAdd" :key="row.item.id"
-              class="p-3 flex items-center gap-3 cursor-pointer hover:bg-accent transition-colors"
-              @click="addTarget = { name: row.item.name, per100g: row.item.per100g }">
-              <component :is="row.type === 'dish' ? ChefHat : Apple" class="w-7 h-7 text-muted-foreground flex-shrink-0" />
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate">{{ row.item.name }}</p>
-                <p class="text-xs text-muted-foreground">
-                  {{ row.type === 'dish' ? 'блюдо' : 'продукт' }} · {{ row.item.per100g.calories }} ккал/100г
-                </p>
-              </div>
-            </Card>
-          </template>
-          <p v-else class="text-sm text-muted-foreground text-center py-6">Начните вводить название</p>
-        </div>
+      <div v-if="log.length === 0" class="text-center py-10">
+        <p class="text-sm text-muted-foreground mb-3">Нет записей за этот день</p>
+        <Button variant="outline" @click="openAddModal"><Plus class="w-4 h-4 mr-2" />Добавить приём пищи</Button>
       </div>
-
-      <!-- Selected item form -->
-      <Card v-else class="p-4 space-y-4">
-        <div class="flex items-start justify-between">
-          <div>
-            <p class="font-semibold">{{ addTarget.name }}</p>
-            <p class="text-xs text-muted-foreground mt-0.5">{{ addTarget.per100g.calories }} ккал / 100г</p>
-          </div>
-          <button @click="addTarget = null" class="text-muted-foreground hover:text-foreground"><X class="w-4 h-4" /></button>
-        </div>
-
-        <!-- Live preview -->
-        <div class="grid grid-cols-4 gap-2 text-center text-sm">
-          <div class="p-2 rounded-md bg-orange-500/10">
-            <p class="font-bold text-orange-500">{{ Math.round(addTarget.per100g.calories * addGrams / 100) }}</p>
-            <p class="text-xs text-muted-foreground">ккал</p>
-          </div>
-          <div class="p-2 rounded-md bg-blue-500/10">
-            <p class="font-bold text-blue-500">{{ (addTarget.per100g.protein * addGrams / 100).toFixed(1) }}</p>
-            <p class="text-xs text-muted-foreground">белки</p>
-          </div>
-          <div class="p-2 rounded-md bg-yellow-500/10">
-            <p class="font-bold text-yellow-500">{{ (addTarget.per100g.fat * addGrams / 100).toFixed(1) }}</p>
-            <p class="text-xs text-muted-foreground">жиры</p>
-          </div>
-          <div class="p-2 rounded-md bg-green-500/10">
-            <p class="font-bold text-green-500">{{ (addTarget.per100g.carbs * addGrams / 100).toFixed(1) }}</p>
-            <p class="text-xs text-muted-foreground">углев</p>
-          </div>
-        </div>
-
-        <div class="space-y-2">
-          <Label>Граммовка</Label>
-          <!-- Быстрые пресеты -->
-          <div class="flex flex-wrap gap-1.5">
-            <button v-for="g in [25, 50, 75, 100, 125, 150, 200, 250]" :key="g"
-              :class="['px-2.5 py-1 rounded-md text-xs font-medium border transition-colors',
-                addGrams === g
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-muted text-muted-foreground border-transparent hover:border-border']"
-              @click="addGrams = g">
-              {{ g }}г
-            </button>
-          </div>
-          <!-- Точный счётчик -->
-          <div class="flex items-center gap-2">
-            <button class="w-9 h-9 rounded-md border flex items-center justify-center text-lg hover:bg-accent transition-colors"
-              @click="addGrams = Math.max(25, addGrams - 25)">−</button>
-            <Input v-model.number="addGrams" type="number" min="25" step="25" class="flex-1 text-center" />
-            <button class="w-9 h-9 rounded-md border flex items-center justify-center text-lg hover:bg-accent transition-colors"
-              @click="addGrams = addGrams + 25">+</button>
-          </div>
-        </div>
-        <div class="flex gap-3">
-          <div class="flex-1 space-y-1">
-            <Label>Приём пищи</Label>
-            <select v-model="addMeal" class="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-              <option v-for="m in meals" :key="m.value" :value="m.value">{{ m.label }}</option>
-            </select>
-          </div>
-        </div>
-        <Button class="w-full" @click="addToLog"><Plus class="w-4 h-4 mr-2" />Добавить в дневник</Button>
-      </Card>
     </div>
 
     <!-- ── PRODUCTS ── -->
@@ -936,6 +859,98 @@ async function saveGoals() {
       <div class="flex gap-2">
         <Button variant="outline" class="flex-1" @click="showDishBuilder = false">Отмена</Button>
         <Button class="flex-1" @click="saveDish" :disabled="!dishName.trim() || dishIngredients.length === 0">Сохранить</Button>
+      </div>
+    </Card>
+  </div>
+
+  <!-- ── Add to log modal ── -->
+  <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4">
+    <Card class="w-full sm:max-w-md rounded-b-none sm:rounded-xl p-5 space-y-4 max-h-[90vh] overflow-auto">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-lg">Добавить в дневник</h2>
+        <button @click="showAddModal = false"><X class="w-4 h-4 text-muted-foreground" /></button>
+      </div>
+
+      <!-- Search -->
+      <div v-if="!addTarget" class="space-y-3">
+        <div class="relative">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input v-model="addQuery" placeholder="Поиск продукта или блюда..." class="pl-9" autofocus />
+        </div>
+        <div class="space-y-1.5 max-h-60 overflow-auto">
+          <template v-if="addQuery">
+            <p v-if="filteredAdd.length === 0" class="text-sm text-muted-foreground text-center py-6">Ничего не найдено</p>
+            <div v-for="row in filteredAdd" :key="row.item.id"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-accent transition-colors"
+              @click="addTarget = { name: row.item.name, per100g: row.item.per100g }">
+              <component :is="row.type === 'dish' ? ChefHat : Apple" class="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate">{{ row.item.name }}</p>
+                <p class="text-xs text-muted-foreground">{{ row.type === 'dish' ? 'блюдо' : 'продукт' }} · {{ row.item.per100g.calories }} ккал/100г</p>
+              </div>
+            </div>
+          </template>
+          <p v-else class="text-sm text-muted-foreground text-center py-4">Начните вводить название</p>
+        </div>
+      </div>
+
+      <!-- Selected item -->
+      <div v-else class="space-y-4">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="font-semibold">{{ addTarget.name }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ addTarget.per100g.calories }} ккал / 100г</p>
+          </div>
+          <button @click="addTarget = null" class="text-muted-foreground hover:text-foreground p-1"><X class="w-4 h-4" /></button>
+        </div>
+
+        <!-- Live КБЖУ preview -->
+        <div class="grid grid-cols-4 gap-2 text-center text-sm">
+          <div class="p-2 rounded-md bg-orange-500/10">
+            <p class="font-bold text-orange-500">{{ Math.round(addTarget.per100g.calories * addGrams / 100) }}</p>
+            <p class="text-xs text-muted-foreground">ккал</p>
+          </div>
+          <div class="p-2 rounded-md bg-blue-500/10">
+            <p class="font-bold text-blue-500">{{ (addTarget.per100g.protein * addGrams / 100).toFixed(1) }}</p>
+            <p class="text-xs text-muted-foreground">белки</p>
+          </div>
+          <div class="p-2 rounded-md bg-yellow-500/10">
+            <p class="font-bold text-yellow-500">{{ (addTarget.per100g.fat * addGrams / 100).toFixed(1) }}</p>
+            <p class="text-xs text-muted-foreground">жиры</p>
+          </div>
+          <div class="p-2 rounded-md bg-green-500/10">
+            <p class="font-bold text-green-500">{{ (addTarget.per100g.carbs * addGrams / 100).toFixed(1) }}</p>
+            <p class="text-xs text-muted-foreground">углев</p>
+          </div>
+        </div>
+
+        <!-- Граммовка -->
+        <div class="space-y-2">
+          <Label>Граммовка</Label>
+          <div class="flex flex-wrap gap-1.5">
+            <button v-for="g in [25, 50, 75, 100, 125, 150, 200, 250]" :key="g"
+              :class="['px-2.5 py-1 rounded-md text-xs font-medium border transition-colors',
+                addGrams === g ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted text-muted-foreground border-transparent hover:border-border']"
+              @click="addGrams = g">{{ g }}г</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="w-9 h-9 rounded-md border flex items-center justify-center text-lg hover:bg-accent transition-colors"
+              @click="addGrams = Math.max(25, addGrams - 25)">−</button>
+            <Input v-model.number="addGrams" type="number" min="25" step="25" class="flex-1 text-center" />
+            <button class="w-9 h-9 rounded-md border flex items-center justify-center text-lg hover:bg-accent transition-colors"
+              @click="addGrams = addGrams + 25">+</button>
+          </div>
+        </div>
+
+        <!-- Приём пищи -->
+        <div class="space-y-1">
+          <Label>Приём пищи</Label>
+          <select v-model="addMeal" class="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+            <option v-for="m in meals" :key="m.value" :value="m.value">{{ m.label }}</option>
+          </select>
+        </div>
+
+        <Button class="w-full" @click="addToLog"><Plus class="w-4 h-4 mr-2" />Добавить в дневник</Button>
       </div>
     </Card>
   </div>
