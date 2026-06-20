@@ -632,19 +632,38 @@ async function saveGoals() {
         <Button @click="openNewDish"><Plus class="w-4 h-4 mr-2" />Новое блюдо</Button>
       </div>
       <p v-if="dishes.length === 0" class="text-sm text-muted-foreground text-center py-10">Нет блюд. Создайте из продуктов.</p>
-      <Card v-for="d in dishes" :key="d.id" class="p-3">
+      <Card v-for="d in dishes" :key="d.id" class="p-3 space-y-2">
         <div class="flex items-center gap-3">
           <ChefHat class="w-6 h-6 text-muted-foreground flex-shrink-0" />
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium truncate">{{ d.name }}</p>
-            <p class="text-xs text-muted-foreground">
-              {{ d.per100g.calories }} ккал/100г · {{ d.totalGrams }}г итого
-            </p>
+            <p class="text-xs text-muted-foreground">{{ d.totalGrams }}г итого</p>
           </div>
           <button class="p-1 text-muted-foreground hover:text-foreground" @click="openEditDish(d)"><Pencil class="w-3.5 h-3.5" /></button>
           <button class="p-1 text-muted-foreground hover:text-destructive" @click="deleteDish(d.id)"><Trash2 class="w-3.5 h-3.5" /></button>
         </div>
-        <div class="mt-2 flex flex-wrap gap-1">
+        <!-- КБЖУ -->
+        <div class="grid grid-cols-2 gap-1.5 text-xs">
+          <div class="rounded-md bg-muted/60 px-2.5 py-1.5 space-y-0.5">
+            <p class="text-muted-foreground font-medium">На блюдо ({{ d.totalGrams }}г)</p>
+            <div class="flex flex-wrap gap-x-3 gap-y-0.5">
+              <span class="text-orange-500 font-semibold">{{ Math.round(d.per100g.calories * d.totalGrams / 100) }} ккал</span>
+              <span>Б <b>{{ (d.per100g.protein * d.totalGrams / 100).toFixed(1) }}</b>г</span>
+              <span>Ж <b>{{ (d.per100g.fat * d.totalGrams / 100).toFixed(1) }}</b>г</span>
+              <span>У <b>{{ (d.per100g.carbs * d.totalGrams / 100).toFixed(1) }}</b>г</span>
+            </div>
+          </div>
+          <div class="rounded-md bg-muted/60 px-2.5 py-1.5 space-y-0.5">
+            <p class="text-muted-foreground font-medium">На 100г</p>
+            <div class="flex flex-wrap gap-x-3 gap-y-0.5">
+              <span class="text-orange-500 font-semibold">{{ d.per100g.calories }} ккал</span>
+              <span>Б <b>{{ d.per100g.protein }}</b>г</span>
+              <span>Ж <b>{{ d.per100g.fat }}</b>г</span>
+              <span>У <b>{{ d.per100g.carbs }}</b>г</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-1">
           <span v-for="ing in d.ingredients" :key="ing.productId"
             class="text-xs bg-muted px-2 py-0.5 rounded-full">
             {{ ing.productName }} {{ ing.grams }}г
