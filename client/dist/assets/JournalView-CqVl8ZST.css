@@ -1,1 +1,0 @@
-.tiptap p.is-editor-empty:first-child:before{content:attr(data-placeholder);float:left;color:hsl(var(--muted-foreground));pointer-events:none;height:0}.tiptap img{max-width:calc(100% - 24px);max-height:400px;width:auto;border-radius:.5rem;margin:4px 12px;display:block;-o-object-fit:contain;object-fit:contain}
