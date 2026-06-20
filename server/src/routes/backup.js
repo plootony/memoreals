@@ -96,10 +96,16 @@ router.post('/restore', async (req, res) => {
       ws.on('error', reject)
     })
 
-    // 3. Атомарно заменяем db.sqlite (Linux: rename на том же FS = атомарно)
+    // 3. Удаляем WAL/SHM — иначе SQLite применит старые транзакции к новому файлу
+    const { unlinkSync } = await import('fs')
+    for (const ext of ['-wal', '-shm']) {
+      try { unlinkSync(DB_PATH + ext) } catch {}
+    }
+
+    // 4. Атомарно заменяем db.sqlite
     renameSync(TMP_PATH, DB_PATH)
 
-    // 4. Перезапускаем PM2 чтобы новый процесс открыл новый файл
+    // 5. Перезапускаем PM2
     res.json({ ok: true })
     setTimeout(() => execAsync('pm2 restart memoreals').catch(() => {}), 200)
 
