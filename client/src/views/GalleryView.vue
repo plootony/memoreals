@@ -14,6 +14,7 @@ const activeAlbum = ref<string | null>(null)
 const uploading = ref(false)
 const lightbox = ref<Photo | null>(null)
 const conflict = ref<DeleteConflict | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 
 async function load() {
   const r = await api.get('/gallery')
@@ -113,13 +114,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     <!-- Header -->
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-bold">Галерея</h1>
-      <label class="cursor-pointer">
-        <input type="file" accept="image/*" multiple class="hidden" @change="upload" :disabled="uploading" />
-        <Button as="span" :disabled="uploading">
-          <ImagePlus class="w-4 h-4 mr-2" />
-          {{ uploading ? 'Загружаю...' : 'Добавить' }}
-        </Button>
-      </label>
+      <input ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="upload" />
+      <Button @click="fileInput?.click()" :disabled="uploading">
+        <ImagePlus class="w-4 h-4 mr-2" />
+        {{ uploading ? 'Загружаю...' : 'Добавить' }}
+      </Button>
     </div>
 
     <!-- Album filter -->
