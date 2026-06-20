@@ -23,7 +23,11 @@
       "Read(//tmp/sshtool/node_modules/node-ssh/**)",
       "Bash(node -e *)",
       "Bash(npx vue-tsc *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(GIT_SSH_COMMAND=\"ssh -v\" git push)",
+      "Bash(rsync -avz --progress -e 'ssh -i /home/boo/.ssh/id_vps -o StrictHostKeyChecking=no' --include=client/dist/*** --include=client/src/*** --include=server/src/*** --include=server/src/db/*** --include=server/src/routes/*** --exclude=node_modules --exclude=.git client/dist/ root@93.171.232.55:/root/memoreals/client/dist/)",
+      "Bash(timeout 10 ssh -o ConnectTimeout=8 -T git@github.com)",
+      "Bash(timeout 10 ssh -o ConnectTimeout=8 -p 443 git@ssh.github.com)"
     ]
   }
 }
