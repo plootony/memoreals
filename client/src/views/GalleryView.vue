@@ -182,27 +182,27 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       </button>
 
       <!-- Prev -->
-      <button v-if="filtered.findIndex(p => p.id === lightbox.id) > 0"
+      <button v-if="lightbox && filtered.findIndex(p => p.id === lightbox!.id) > 0"
         class="absolute left-2 sm:left-4 text-white/70 hover:text-white p-2 z-10"
         @click="lightboxPrev">
         <ChevronLeft class="w-8 h-8" />
       </button>
 
       <!-- Image -->
-      <img :src="lightbox.url" class="max-w-full max-h-full object-contain select-none"
+      <img v-if="lightbox" :src="lightbox.url" class="max-w-full max-h-full object-contain select-none"
         style="max-height: 90vh; max-width: 90vw" />
 
       <!-- Next -->
-      <button v-if="filtered.findIndex(p => p.id === lightbox.id) < filtered.length - 1"
+      <button v-if="lightbox && filtered.findIndex(p => p.id === lightbox!.id) < filtered.length - 1"
         class="absolute right-2 sm:right-4 text-white/70 hover:text-white p-2 z-10"
         @click="lightboxNext">
         <ChevronRight class="w-8 h-8" />
       </button>
 
       <!-- Caption -->
-      <div class="absolute bottom-4 left-0 right-0 text-center">
+      <div v-if="lightbox" class="absolute bottom-4 left-0 right-0 text-center">
         <span class="text-white/50 text-sm">{{ albumName(lightbox.albumId) }} · {{ new Date(lightbox.createdAt).toLocaleDateString('ru') }}</span>
-        <span class="text-white/30 text-sm ml-3">{{ filtered.findIndex(p => p.id === lightbox.id) + 1 }} / {{ filtered.length }}</span>
+        <span class="text-white/30 text-sm ml-3">{{ filtered.findIndex(p => p.id === lightbox!.id) + 1 }} / {{ filtered.length }}</span>
       </div>
     </div>
   </Transition>
