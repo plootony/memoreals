@@ -457,7 +457,7 @@ const exportDate = ref(new Date().toISOString().slice(0, 10))
 const exportFrom = ref('')
 const exportTo   = ref(new Date().toISOString().slice(0, 10))
 
-function downloadExport() {
+async function downloadExport() {
   const params = new URLSearchParams()
   if (exportMode.value === 'today') {
     params.set('date', new Date().toISOString().slice(0, 10))
@@ -467,12 +467,18 @@ function downloadExport() {
     if (exportFrom.value) params.set('from', exportFrom.value)
     if (exportTo.value)   params.set('to',   exportTo.value)
   }
-  // all — no params
-  const url = `/api/diet/export?${params}`
-  const a = document.createElement('a')
-  a.href = url
-  a.click()
-  showExport.value = false
+  try {
+    const res = await api.get(`/diet/export?${params}`, { responseType: 'blob' })
+    const filename = res.headers['content-disposition']?.match(/filename="(.+?)"/)?.[1]
+      || `diet-export.json`
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url; a.download = filename; a.click()
+    URL.revokeObjectURL(url)
+    showExport.value = false
+  } catch (e) {
+    console.error('Export failed', e)
+  }
 }
 
 // ── Goals ──────────────────────────────────────────────────────────────────────
