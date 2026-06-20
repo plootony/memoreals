@@ -298,4 +298,55 @@ router.put('/weight/goal', async (req, res) => {
   }
 })
 
+// ── Body Measurements ────────────────────────────────────────────────────────
+
+router.get('/measurements', async (req, res) => {
+  const { codeword } = req.headers
+  if (!codeword) return res.status(400).json({ error: 'codeword required' })
+  try {
+    const data = await getUserData(req.user.userId, codeword)
+    res.json(data.bodyMeasurements || [])
+  } catch (e) {
+    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
+    res.status(500).json({ error: e.message })
+  }
+})
+
+router.post('/measurements', async (req, res) => {
+  const { codeword } = req.headers
+  if (!codeword) return res.status(400).json({ error: 'codeword required' })
+  try {
+    const data = await getUserData(req.user.userId, codeword)
+    if (!data.bodyMeasurements) data.bodyMeasurements = []
+    const entry = {
+      id: uuidv4(),
+      date: req.body.date || new Date().toISOString().slice(0, 10),
+      values: req.body.values || {},
+      note: req.body.note || '',
+      createdAt: new Date().toISOString(),
+    }
+    data.bodyMeasurements.push(entry)
+    data.bodyMeasurements.sort((a, b) => a.date.localeCompare(b.date))
+    await setUserData(req.user.userId, codeword, data)
+    res.json(data.bodyMeasurements)
+  } catch (e) {
+    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
+    res.status(500).json({ error: e.message })
+  }
+})
+
+router.delete('/measurements/:id', async (req, res) => {
+  const { codeword } = req.headers
+  if (!codeword) return res.status(400).json({ error: 'codeword required' })
+  try {
+    const data = await getUserData(req.user.userId, codeword)
+    data.bodyMeasurements = (data.bodyMeasurements || []).filter(e => e.id !== req.params.id)
+    await setUserData(req.user.userId, codeword, data)
+    res.json(data.bodyMeasurements)
+  } catch (e) {
+    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
+    res.status(500).json({ error: e.message })
+  }
+})
+
 export default router

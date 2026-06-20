@@ -34,6 +34,7 @@ function getDefaultData() {
     debts: [],
     cushion: { goal: 0, contributions: [] },
     study: [],
+    bodyMeasurements: [],
     wishlist: { items: [], categories: ['Электроника', 'Одежда', 'Дом', 'Спорт', 'Другое'] },
     plans: {
       tasks: [],

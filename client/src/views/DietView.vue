@@ -22,7 +22,7 @@ interface LogEntry { id: string; name: string; grams: number; meal: string; date
 interface Goals { calories: number; protein: number; fat: number; carbs: number }
 
 // ── State ────────────────────────────────────────────────────────────────────
-const tab = ref<'log' | 'add' | 'products' | 'dishes' | 'weight'>('log')
+const tab = ref<'log' | 'add' | 'products' | 'dishes' | 'weight' | 'measurements'>('log')
 const selectedDate = ref(new Date().toISOString().slice(0, 10))
 
 const log = ref<LogEntry[]>([])
@@ -204,7 +204,7 @@ async function loadAll() {
   dishes.value = dishesRes.data
 }
 watch(selectedDate, () => api.get('/diet/log', { params: { date: selectedDate.value } }).then(r => log.value = r.data))
-onMounted(() => Promise.all([loadAll(), loadWeight()]))
+onMounted(() => Promise.all([loadAll(), loadWeight(), loadMeasurements()]))
 
 // ── Totals ────────────────────────────────────────────────────────────────────
 const totals = computed(() => log.value.reduce((a, e) => ({
@@ -359,6 +359,89 @@ async function deleteDish(id: string) {
   dishes.value = dishes.value.filter(d => d.id !== id)
 }
 
+// ── Body Measurements ─────────────────────────────────────────────────────────
+interface MeasurementEntry { id: string; date: string; note: string; values: Partial<Record<string, number>> }
+
+const measurementFields = [
+  { key: 'waist',      label: 'Талия',        color: '#f97316' },
+  { key: 'chest',      label: 'Грудь',        color: '#3b82f6' },
+  { key: 'hips',       label: 'Бёдра',        color: '#a855f7' },
+  { key: 'leftArm',    label: 'Рука (лев.)',   color: '#22c55e' },
+  { key: 'rightArm',   label: 'Рука (прав.)',  color: '#84cc16' },
+  { key: 'leftThigh',  label: 'Бедро (лев.)',  color: '#ef4444' },
+  { key: 'rightThigh', label: 'Бедро (прав.)', color: '#f43f5e' },
+  { key: 'neck',       label: 'Шея',           color: '#14b8a6' },
+]
+
+const measurements = ref<MeasurementEntry[]>([])
+const mFormDate = ref(new Date().toISOString().slice(0, 10))
+const mFormNote = ref('')
+const mFormValues = ref<Partial<Record<string, string>>>({})
+const mPeriod = ref<'1w' | '1m' | '3m' | '6m' | '1y' | 'all'>('3m')
+const mSelected = ref<string[]>(['waist'])
+
+async function loadMeasurements() {
+  const res = await api.get('/diet/measurements')
+  measurements.value = res.data
+}
+
+async function addMeasurement() {
+  const values: Partial<Record<string, number>> = {}
+  for (const f of measurementFields) {
+    const v = mFormValues.value[f.key]
+    if (v !== undefined && v !== '') values[f.key] = Number(v)
+  }
+  if (Object.keys(values).length === 0) return
+  const res = await api.post('/diet/measurements', { date: mFormDate.value, values, note: mFormNote.value })
+  measurements.value = res.data
+  mFormValues.value = {}
+  mFormNote.value = ''
+}
+
+async function deleteMeasurement(id: string) {
+  const res = await api.delete(`/diet/measurements/${id}`)
+  measurements.value = res.data
+}
+
+function toggleMField(key: string) {
+  mSelected.value = mSelected.value.includes(key)
+    ? mSelected.value.filter(k => k !== key)
+    : [...mSelected.value, key]
+}
+
+const filteredMeasurements = computed(() => {
+  const days = ({ '1w': 7, '1m': 30, '3m': 90, '6m': 180, '1y': 365, 'all': Infinity } as Record<string, number>)[mPeriod.value]
+  if (days === Infinity) return measurements.value
+  const from = new Date(); from.setDate(from.getDate() - days)
+  const fromStr = from.toISOString().slice(0, 10)
+  return measurements.value.filter(e => e.date >= fromStr)
+})
+
+const measurementChartData = computed(() => {
+  const entries = filteredMeasurements.value
+  if (!entries.length || !mSelected.value.length) return null
+  const labels = [...new Set(entries.map(e => e.date))].sort()
+  const datasets = mSelected.value.map(key => {
+    const field = measurementFields.find(f => f.key === key)!
+    const byDate = new Map(entries.filter(e => e.values[key] != null).map(e => [e.date, e.values[key] as number]))
+    return {
+      label: `${field.label} (мм)`,
+      data: labels.map(d => byDate.get(d) ?? null),
+      borderColor: field.color,
+      backgroundColor: field.color + '22',
+      fill: false, tension: 0.3, pointRadius: 4, pointHoverRadius: 6, spanGaps: true,
+    }
+  }).filter(ds => ds.data.some(v => v != null))
+  return datasets.length ? { labels, datasets } : null
+})
+
+const measurementChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { position: 'bottom' as const } },
+  scales: { y: { ticks: { callback: (v: any) => `${v} мм` } } },
+}
+
 // ── Goals ──────────────────────────────────────────────────────────────────────
 async function saveGoals() {
   const r = await api.put('/diet/goals', goalsEdit.value)
@@ -403,7 +486,7 @@ async function saveGoals() {
 
     <!-- Tabs -->
     <div class="flex gap-0 border-b overflow-x-auto">
-      <button v-for="[v, l] in [['log','Дневник'],['add','Добавить'],['products','Продукты'],['dishes','Блюда'],['weight','Вес']]" :key="v"
+      <button v-for="[v, l] in [['log','Дневник'],['add','Добавить'],['products','Продукты'],['dishes','Блюда'],['weight','Вес'],['measurements','Замеры']]" :key="v"
         class="whitespace-nowrap flex-shrink-0"
         :class="['px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap', tab === v ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground']"
         @click="tab = v as any">{{ l }}</button>
@@ -669,6 +752,88 @@ async function saveGoals() {
           </button>
         </div>
         <p v-if="weightLog.length === 0" class="text-sm text-muted-foreground text-center py-6">Нет замеров</p>
+      </div>
+    </div>
+
+    <!-- ── MEASUREMENTS ── -->
+    <div v-if="tab === 'measurements'" class="space-y-4">
+
+      <!-- Period + field selector -->
+      <Card class="p-4 space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <span class="text-sm font-medium text-muted-foreground">График</span>
+          <div class="flex rounded-lg border overflow-hidden">
+            <button v-for="p in weightPeriods" :key="p.v"
+              :class="['px-2.5 py-1 text-xs font-medium transition-colors border-r last:border-r-0',
+                mPeriod === p.v ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground']"
+              @click="mPeriod = p.v as any">{{ p.l }}</button>
+          </div>
+        </div>
+        <!-- Measurement toggles -->
+        <div class="flex flex-wrap gap-1.5">
+          <button v-for="f in measurementFields" :key="f.key"
+            :class="['px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+              mSelected.includes(f.key)
+                ? 'text-white border-transparent'
+                : 'bg-transparent border-border text-muted-foreground hover:border-muted-foreground']"
+            :style="mSelected.includes(f.key) ? `background:${f.color}; border-color:${f.color}` : ''"
+            @click="toggleMField(f.key)">
+            {{ f.label }}
+          </button>
+        </div>
+        <div v-if="measurementChartData" class="h-64">
+          <Line :data="measurementChartData" :options="measurementChartOptions" />
+        </div>
+        <p v-else class="text-sm text-muted-foreground text-center py-10">Нет данных за выбранный период</p>
+      </Card>
+
+      <!-- Add form -->
+      <Card class="p-4 space-y-3">
+        <p class="text-sm font-medium">Добавить замер</p>
+        <div class="space-y-1">
+          <Label class="text-xs">Дата</Label>
+          <Input v-model="mFormDate" type="date" class="h-9 w-40" />
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div v-for="f in measurementFields" :key="f.key" class="space-y-1">
+            <Label class="text-xs">{{ f.label }} (мм)</Label>
+            <Input v-model="mFormValues[f.key]" type="number" min="0" placeholder="—" class="h-9" />
+          </div>
+        </div>
+        <div class="space-y-1">
+          <Label class="text-xs">Заметка</Label>
+          <Input v-model="mFormNote" placeholder="Необязательно" class="h-9" />
+        </div>
+        <Button @click="addMeasurement" :disabled="Object.values(mFormValues).every(v => !v)">
+          <Plus class="w-4 h-4 mr-2" />Сохранить замер
+        </Button>
+      </Card>
+
+      <!-- History -->
+      <div class="space-y-2">
+        <div v-for="entry in [...measurements].reverse()" :key="entry.id"
+          class="rounded-lg border bg-card p-3 group hover:bg-accent/20 transition-colors">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium">{{ entry.date }}</span>
+            <div class="flex items-center gap-2">
+              <span v-if="entry.note" class="text-xs text-muted-foreground truncate max-w-32">{{ entry.note }}</span>
+              <button class="p-1 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                @click="deleteMeasurement(entry.id)">
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-x-4 gap-y-1">
+            <span v-for="f in measurementFields.filter(f => entry.values[f.key] != null)" :key="f.key"
+              class="text-xs">
+              <span class="text-muted-foreground">{{ f.label }}:</span>
+              <span class="font-semibold ml-1">{{ entry.values[f.key] }} мм</span>
+            </span>
+          </div>
+        </div>
+        <p v-if="measurements.length === 0" class="text-sm text-muted-foreground text-center py-6">
+          Нет замеров. Добавьте первый.
+        </p>
       </div>
     </div>
 
