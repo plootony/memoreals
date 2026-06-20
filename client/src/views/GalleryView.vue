@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import api from '@/api'
 import Button from '@/components/ui/Button.vue'
-import { Plus, Trash2, X, ChevronLeft, ChevronRight, ImagePlus } from 'lucide-vue-next'
+import { Plus, Trash2, X, ChevronLeft, ChevronRight, ImagePlus, FolderPlus } from 'lucide-vue-next'
 
 interface Album { id: string; name: string; isSystem: boolean; count: number }
 interface Photo { id: string; url: string; albumId: string; note: string; createdAt: string }
@@ -15,6 +15,17 @@ const uploading = ref(false)
 const lightbox = ref<Photo | null>(null)
 const conflict = ref<DeleteConflict | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const newAlbumName = ref('')
+const showNewAlbum = ref(false)
+
+async function createAlbum() {
+  if (!newAlbumName.value.trim()) return
+  const r = await api.post('/gallery/albums', { name: newAlbumName.value.trim() })
+  albums.value.push(r.data)
+  activeAlbum.value = r.data.id
+  newAlbumName.value = ''
+  showNewAlbum.value = false
+}
 
 async function load() {
   const r = await api.get('/gallery')
@@ -55,8 +66,8 @@ async function upload(e: Event) {
     for (const file of Array.from(files)) {
       const form = new FormData()
       form.append('image', file)
-      const r = await api.post('/gallery', form)
-      photos.value.unshift(r.data)
+      if (activeAlbum.value) form.append('albumId', activeAlbum.value)
+      await api.post('/gallery', form)
     }
     await load()
   } finally {
@@ -122,7 +133,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     </div>
 
     <!-- Album filter -->
-    <div v-if="albums.length" class="flex gap-2 overflow-x-auto pb-1">
+    <div class="flex gap-2 overflow-x-auto pb-1 items-center">
       <button
         :class="['px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex-shrink-0',
           activeAlbum === null ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent']"
@@ -134,6 +145,25 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
           activeAlbum === a.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent']"
         @click="activeAlbum = a.id">
         {{ a.name }} <span class="ml-1 opacity-60">{{ a.count }}</span>
+      </button>
+
+      <!-- New album inline input -->
+      <div v-if="showNewAlbum" class="flex items-center gap-1.5 flex-shrink-0">
+        <input v-model="newAlbumName" placeholder="Название альбома"
+          class="h-8 px-2.5 rounded-full border border-input bg-background text-sm w-40 focus:outline-none focus:ring-1 focus:ring-primary"
+          autofocus @keyup.enter="createAlbum" @keyup.escape="showNewAlbum = false; newAlbumName = ''" />
+        <button @click="createAlbum" class="p-1.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
+          <Plus class="w-3.5 h-3.5" />
+        </button>
+        <button @click="showNewAlbum = false; newAlbumName = ''" class="p-1.5 rounded-full bg-muted hover:bg-accent">
+          <X class="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <button v-else
+        class="p-1.5 rounded-full bg-muted text-muted-foreground hover:bg-accent transition-colors flex-shrink-0"
+        title="Создать альбом"
+        @click="showNewAlbum = true">
+        <Plus class="w-3.5 h-3.5" />
       </button>
     </div>
 
