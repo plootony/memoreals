@@ -16,7 +16,8 @@ export async function uploadImage(file: File, type?: 'cover', source?: 'journal'
 // Открыть диалог выбора файла и загрузить, с колбэком состояния
 export function pickAndUpload(
   onLoading?: (v: boolean) => void,
-  type?: 'cover'
+  type?: 'cover',
+  source?: 'journal'
 ): Promise<string | null> {
   return new Promise(resolve => {
     const input = document.createElement('input')
@@ -27,7 +28,7 @@ export function pickAndUpload(
       if (!file) { resolve(null); return }
       onLoading?.(true)
       try {
-        const url = await uploadImage(file, type)
+        const url = await uploadImage(file, type, source)
         resolve(url)
       } catch {
         resolve(null)
