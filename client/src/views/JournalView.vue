@@ -10,7 +10,7 @@ import { pickAndUpload } from '@/lib/uploadImage'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Card from '@/components/ui/Card.vue'
-import { Plus, Search, ChevronLeft, Trash2, Bold, Italic, List, ListOrdered, Image as ImageIcon, BookOpen, Loader2 } from 'lucide-vue-next'
+import { Plus, Search, ChevronLeft, Trash2, Bold, Italic, List, ListOrdered, Image as ImageIcon, BookOpen, Loader2, Images, X } from 'lucide-vue-next'
 
 interface JournalEntry {
   id: string
@@ -30,6 +30,8 @@ const filterYear = ref('')
 const filterMonth = ref('')
 const loading = ref(false)
 const imageUploading = ref(false)
+const showGalleryPicker = ref(false)
+const galleryPhotos = ref<{ id: string; url: string }[]>([])
 
 const editor = useEditor({
   extensions: [
@@ -112,8 +114,19 @@ async function deleteEntry(id: string) {
 }
 
 async function insertImage() {
-  const url = await pickAndUpload(v => imageUploading.value = v)
+  const url = await pickAndUpload(v => imageUploading.value = v, undefined, 'journal')
   if (url) editor.value?.chain().focus().setImage({ src: url }).run()
+}
+
+async function openGalleryPicker() {
+  const r = await api.get('/gallery')
+  galleryPhotos.value = r.data.photos
+  showGalleryPicker.value = true
+}
+
+function insertFromGallery(url: string) {
+  editor.value?.chain().focus().setImage({ src: url }).run()
+  showGalleryPicker.value = false
 }
 
 onMounted(load)
@@ -181,9 +194,12 @@ onMounted(load)
             <Button size="icon" variant="ghost" class="h-8 w-8" :class="{ 'bg-accent': editor?.isActive('italic') }" @click="editor?.chain().focus().toggleItalic().run()"><Italic class="w-3.5 h-3.5" /></Button>
             <Button size="icon" variant="ghost" class="h-8 w-8" :class="{ 'bg-accent': editor?.isActive('bulletList') }" @click="editor?.chain().focus().toggleBulletList().run()"><List class="w-3.5 h-3.5" /></Button>
             <Button size="icon" variant="ghost" class="h-8 w-8" :class="{ 'bg-accent': editor?.isActive('orderedList') }" @click="editor?.chain().focus().toggleOrderedList().run()"><ListOrdered class="w-3.5 h-3.5" /></Button>
-            <Button size="icon" variant="ghost" class="h-8 w-8" @click="insertImage" :disabled="imageUploading">
+            <Button size="icon" variant="ghost" class="h-8 w-8" @click="insertImage" :disabled="imageUploading" title="Загрузить фото">
               <Loader2 v-if="imageUploading" class="w-3.5 h-3.5 animate-spin" />
               <ImageIcon v-else class="w-3.5 h-3.5" />
+            </Button>
+            <Button size="icon" variant="ghost" class="h-8 w-8" @click="openGalleryPicker" title="Из галереи">
+              <Images class="w-3.5 h-3.5" />
             </Button>
           </div>
           <div class="flex items-center gap-2 ml-auto">
@@ -204,6 +220,26 @@ onMounted(load)
         </div>
       </template>
     </Card>
+  </div>
+
+  <!-- Gallery picker modal -->
+  <div v-if="showGalleryPicker" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4">
+    <div class="bg-card w-full sm:max-w-2xl rounded-t-xl sm:rounded-xl flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between p-4 border-b flex-shrink-0">
+        <h2 class="font-semibold">Выбрать из галереи</h2>
+        <button @click="showGalleryPicker = false"><X class="w-4 h-4 text-muted-foreground" /></button>
+      </div>
+      <div class="overflow-auto p-4">
+        <div v-if="galleryPhotos.length === 0" class="text-center py-12 text-muted-foreground text-sm">Галерея пуста</div>
+        <div v-else class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          <div v-for="p in galleryPhotos" :key="p.id"
+            class="aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+            @click="insertFromGallery(p.url)">
+            <img :src="p.url" class="w-full h-full object-cover" loading="lazy" />
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 

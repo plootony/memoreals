@@ -1,9 +1,13 @@
 import api from '@/api'
 
-export async function uploadImage(file: File, type?: 'cover'): Promise<string> {
+export async function uploadImage(file: File, type?: 'cover', source?: 'journal'): Promise<string> {
   const form = new FormData()
   form.append('image', file)
-  const res = await api.post('/images' + (type ? `?type=${type}` : ''), form, {
+  const params = new URLSearchParams()
+  if (type) params.set('type', type)
+  if (source) params.set('source', source)
+  const query = params.toString() ? '?' + params.toString() : ''
+  const res = await api.post('/images' + query, form, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
   return res.data.url

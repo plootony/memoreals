@@ -13,7 +13,7 @@ import api from '@/api'
 import {
   BookOpen, Wallet, Music, Apple, GraduationCap, Settings,
   Menu, X, Moon, Sun, ChevronLeft, ChevronRight, Lock, ListTodo,
-  LayoutDashboard, Search, Gift
+  LayoutDashboard, Search, Gift, Images
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -46,6 +46,7 @@ const navItems = [
   { to: '/study', label: 'Учёба', icon: GraduationCap },
   { to: '/plans', label: 'Планы', icon: ListTodo },
   { to: '/wishlist', label: 'Вишлист', icon: Gift },
+  { to: '/gallery', label: 'Галерея', icon: Images },
 ]
 
 // Проверка дедлайнов и показ напоминаний

@@ -4,6 +4,8 @@ import sharp from 'sharp'
 import { v4 as uuidv4 } from 'uuid'
 import { requireAuth } from '../middleware/auth.js'
 import { uploadToR2, deleteFromR2 } from '../services/r2.js'
+import db from '../db/sqlite.js'
+import { ensureJournalAlbum } from './gallery.js'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -19,6 +21,7 @@ router.post('/', upload.single('image'), async (req, res) => {
   try {
     const filename = `img_${uuidv4()}.webp`
     const isCover = req.query.type === 'cover'
+    const isJournal = req.query.source === 'journal'
     const transform = sharp(req.file.buffer)
 
     if (isCover) {
@@ -29,6 +32,13 @@ router.post('/', upload.single('image'), async (req, res) => {
 
     const buffer = await transform.webp({ quality: 82 }).toBuffer()
     const url = await uploadToR2(buffer, filename)
+
+    // Фото из дневника автоматически попадают в альбом "Дневник"
+    if (isJournal) {
+      const album = ensureJournalAlbum(req.user.userId)
+      db.prepare('INSERT INTO photos (id, user_id, album_id, url, note, created_at) VALUES (?,?,?,?,?,?)')
+        .run(uuidv4(), req.user.userId, album.id, url, '', new Date().toISOString())
+    }
 
     res.json({ url })
   } catch (e) {
