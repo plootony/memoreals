@@ -17,6 +17,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
+            set -e
             cd /root/memoreals
             git fetch origin main
             git reset --hard origin/main
