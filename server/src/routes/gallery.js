@@ -89,7 +89,7 @@ router.post('/', upload.single('image'), async (req, res) => {
 })
 
 // DELETE /api/gallery/:id — удалить фото (с проверкой использования в дневнике)
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   const uid = req.user.userId
   const { codeword } = req.headers
   const force = req.query.force === 'true'
@@ -114,11 +114,17 @@ router.delete('/:id', (req, res) => {
     }
   }
 
-  // Извлекаем имя файла из URL и удаляем из R2
-  const filename = photo.url.split('/').pop()
-  deleteFromR2(filename).catch(() => {})
-
+  // Удаляем из БД сначала
   db.prepare('DELETE FROM photos WHERE id = ?').run(photo.id)
+
+  // Удаляем из R2 (await — чтобы не потерять тихо)
+  const filename = photo.url.split('/').pop()
+  try {
+    await deleteFromR2(filename)
+  } catch (e) {
+    console.error('R2 delete failed for', filename, e.message)
+  }
+
   res.json({ ok: true })
 })
 
