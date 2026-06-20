@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
@@ -8,7 +8,7 @@ import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Button from '@/components/ui/Button.vue'
 import Label from '@/components/ui/Label.vue'
-import { Lock, User, Key, Shield, LogOut, Download, Loader2 } from 'lucide-vue-next'
+import { Lock, User, Key, Shield, LogOut, Download, Loader2, Database, RotateCcw, Plus, Trash2 } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const lock = useLockStore()
@@ -120,6 +120,63 @@ function logout() {
   auth.logout()
   router.push('/login')
 }
+
+// ── Backup ────────────────────────────────────────────────────────────────────
+interface Backup { key: string; name: string; size: number; date: string }
+
+const backups = ref<Backup[]>([])
+const backupLoading = ref(false)
+const backupCreating = ref(false)
+const restoring = ref<string | null>(null)
+const confirmRestore = ref<Backup | null>(null)
+
+async function loadBackups() {
+  backupLoading.value = true
+  try {
+    const r = await api.get('/backup')
+    backups.value = r.data
+  } finally {
+    backupLoading.value = false
+  }
+}
+
+async function createBackup() {
+  backupCreating.value = true
+  try {
+    await api.post('/backup/create')
+    await loadBackups()
+  } finally {
+    backupCreating.value = false
+  }
+}
+
+async function restoreBackup(backup: Backup) {
+  confirmRestore.value = null
+  restoring.value = backup.key
+  try {
+    await api.post('/backup/restore', { key: backup.key })
+    setTimeout(() => { restoring.value = null }, 3000)
+  } catch {
+    restoring.value = null
+  }
+}
+
+async function deleteBackup(backup: Backup) {
+  await api.delete('/backup', { data: { key: backup.key } })
+  backups.value = backups.value.filter(b => b.key !== backup.key)
+}
+
+function formatSize(bytes: number) {
+  return bytes > 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)} МБ`
+    : `${Math.round(bytes / 1024)} КБ`
+}
+
+function formatBackupDate(dateStr: string) {
+  return new Date(dateStr).toLocaleString('ru', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+onMounted(loadBackups)
 </script>
 
 <template>
@@ -226,11 +283,72 @@ function logout() {
       </Button>
     </Card>
 
+    <!-- Backup -->
+    <Card class="p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <Database class="w-4 h-4 text-muted-foreground" />
+          <h2 class="font-semibold">Резервные копии</h2>
+        </div>
+        <Button size="sm" @click="createBackup" :disabled="backupCreating">
+          <Loader2 v-if="backupCreating" class="w-3.5 h-3.5 mr-1.5 animate-spin" />
+          <Plus v-else class="w-3.5 h-3.5 mr-1.5" />
+          {{ backupCreating ? 'Создаётся...' : 'Создать сейчас' }}
+        </Button>
+      </div>
+
+      <div v-if="backupLoading" class="text-sm text-muted-foreground text-center py-4">
+        <Loader2 class="w-4 h-4 animate-spin inline mr-2" />Загрузка...
+      </div>
+
+      <div v-else-if="backups.length === 0" class="text-sm text-muted-foreground text-center py-4">
+        Нет бэкапов
+      </div>
+
+      <div v-else class="space-y-2">
+        <div v-for="b in backups" :key="b.key"
+          class="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium">{{ formatBackupDate(b.date) }}</p>
+            <p class="text-xs text-muted-foreground">{{ formatSize(b.size) }}</p>
+          </div>
+          <Button size="sm" variant="outline"
+            :disabled="restoring !== null"
+            @click="confirmRestore = b">
+            <RotateCcw class="w-3.5 h-3.5 mr-1.5" />
+            {{ restoring === b.key ? 'Восстанавливаю...' : 'Восстановить' }}
+          </Button>
+          <button class="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+            @click="deleteBackup(b)">
+            <Trash2 class="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </Card>
+
     <!-- Danger zone -->
     <Card class="p-5">
       <Button variant="ghost" class="text-destructive hover:text-destructive hover:bg-destructive/10 w-full justify-start" @click="logout">
         <LogOut class="w-4 h-4 mr-2" />Выйти из аккаунта
       </Button>
+    </Card>
+  </div>
+
+  <!-- Confirm restore modal -->
+  <div v-if="confirmRestore" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <Card class="w-full max-w-sm p-6 space-y-4">
+      <h2 class="font-semibold text-lg">Восстановить бэкап?</h2>
+      <p class="text-sm text-muted-foreground">
+        Все текущие данные будут заменены данными из копии
+        <span class="font-medium text-foreground">{{ formatBackupDate(confirmRestore.date) }}</span>.
+        Это действие необратимо.
+      </p>
+      <div class="flex gap-2">
+        <Button variant="outline" class="flex-1" @click="confirmRestore = null">Отмена</Button>
+        <Button class="flex-1 bg-destructive hover:bg-destructive/90" @click="restoreBackup(confirmRestore!)">
+          Восстановить
+        </Button>
+      </div>
     </Card>
   </div>
 </template>

@@ -16,6 +16,7 @@ import plansRoutes from './routes/plans.js'
 import wishlistRoutes from './routes/wishlist.js'
 import searchRoutes from './routes/search.js'
 import exportRoutes from './routes/export.js'
+import backupRoutes from './routes/backup.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = process.env.PORT || 3001
@@ -38,6 +39,7 @@ app.use('/api/plans', plansRoutes)
 app.use('/api/wishlist', wishlistRoutes)
 app.use('/api/search', searchRoutes)
 app.use('/api/export', exportRoutes)
+app.use('/api/backup', backupRoutes)
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
