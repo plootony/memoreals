@@ -90,10 +90,11 @@ async function setCover(photo: Photo) {
 
 // ── Upload ────────────────────────────────────────────────────────────────────
 function onFilesSelected(e: Event) {
-  const files = Array.from((e.target as HTMLInputElement).files || []);
-  (e.target as HTMLInputElement).value = ''
-  if (!files.length) return
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  if (!files.length) { input.value = ''; return }
   pendingFiles.value = files
+  input.value = '' // clear after saving references
   uploadNote.value = ''
   uploadAlbumId.value = openedAlbum.value?.id
     ?? albums.value.find(a => !a.isSystem)?.id
@@ -111,7 +112,9 @@ async function confirmUpload() {
       form.append('image', file)
       if (uploadAlbumId.value) form.append('albumId', uploadAlbumId.value)
       if (uploadNote.value.trim()) form.append('note', uploadNote.value.trim())
-      await api.post('/gallery', form)
+      await api.post('/gallery', form, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
     }
     await load()
   } finally {
