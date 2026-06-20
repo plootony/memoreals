@@ -1,82 +1,65 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
-import { authDb } from '../db/index.js'
 import { requireAuth } from '../middleware/auth.js'
 import { encrypt, decrypt } from '../utils/crypto.js'
-import { getUserData, setUserData } from '../db/userStore.js'
+import { encryptField, decryptField } from '../utils/fieldCrypto.js'
+import db from '../db/sqlite.js'
 
 const router = Router()
 router.use(requireAuth)
 
-// PUT /api/settings/username
 router.put('/username', async (req, res) => {
   const { newUsername, password } = req.body
   if (!newUsername || !password) return res.status(400).json({ error: 'newUsername and password required' })
-  try {
-    await authDb.read()
-    const user = authDb.data.users.find(u => u.id === req.user.userId)
-    if (!user) return res.status(404).json({ error: 'User not found' })
-    if (!await bcrypt.compare(password, user.passwordHash)) return res.status(401).json({ error: 'Wrong password' })
-    const taken = authDb.data.users.find(u => u.username === newUsername && u.id !== user.id)
-    if (taken) return res.status(409).json({ error: 'Username already taken' })
-    user.username = newUsername
-    await authDb.write()
-    res.json({ ok: true, username: newUsername })
-  } catch (e) {
-    res.status(500).json({ error: e.message })
-  }
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.userId)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!await bcrypt.compare(password, user.password_hash)) return res.status(401).json({ error: 'Wrong password' })
+  if (db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(newUsername, user.id)) return res.status(409).json({ error: 'Username already taken' })
+  db.prepare('UPDATE users SET username = ? WHERE id = ?').run(newUsername, user.id)
+  res.json({ ok: true, username: newUsername })
 })
 
-// PUT /api/settings/password
 router.put('/password', async (req, res) => {
   const { currentPassword, newPassword } = req.body
   if (!currentPassword || !newPassword) return res.status(400).json({ error: 'currentPassword and newPassword required' })
-  try {
-    await authDb.read()
-    const user = authDb.data.users.find(u => u.id === req.user.userId)
-    if (!user) return res.status(404).json({ error: 'User not found' })
-    if (!await bcrypt.compare(currentPassword, user.passwordHash)) return res.status(401).json({ error: 'Wrong current password' })
-    user.passwordHash = await bcrypt.hash(newPassword, 12)
-    await authDb.write()
-    res.json({ ok: true })
-  } catch (e) {
-    res.status(500).json({ error: e.message })
-  }
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.userId)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!await bcrypt.compare(currentPassword, user.password_hash)) return res.status(401).json({ error: 'Wrong current password' })
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await bcrypt.hash(newPassword, 12), user.id)
+  res.json({ ok: true })
 })
 
-// PUT /api/settings/codeword — перешифровывает все данные пользователя
+// Re-encrypts journal.content and study chapter content with new codeword
 router.put('/codeword', async (req, res) => {
   const { codeword } = req.headers
   const { newCodeword, password } = req.body
-  if (!codeword) return res.status(400).json({ error: 'codeword header required' })
-  if (!newCodeword || !password) return res.status(400).json({ error: 'newCodeword and password required' })
+  if (!codeword || !newCodeword || !password) return res.status(400).json({ error: 'codeword header, newCodeword and password required' })
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.userId)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!await bcrypt.compare(password, user.password_hash)) return res.status(401).json({ error: 'Wrong password' })
   try {
-    await authDb.read()
-    const user = authDb.data.users.find(u => u.id === req.user.userId)
-    if (!user) return res.status(404).json({ error: 'User not found' })
-    if (!await bcrypt.compare(password, user.passwordHash)) return res.status(401).json({ error: 'Wrong password' })
-
-    // Проверяем старое кодовое слово
-    try {
-      const check = decrypt(user.codewordVerifier, codeword)
-      if (check !== 'codeword_ok') throw new Error()
-    } catch {
-      return res.status(401).json({ error: 'Wrong codeword' })
-    }
-
-    // Перешифровываем все данные
-    const data = await getUserData(req.user.userId, codeword)
-    await setUserData(req.user.userId, newCodeword, data)
-
-    // Обновляем верификатор
-    user.codewordVerifier = encrypt('codeword_ok', newCodeword)
-    await authDb.write()
-
-    res.json({ ok: true })
-  } catch (e) {
-    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
-    res.status(500).json({ error: e.message })
+    if (decrypt(user.codeword_verifier, codeword) !== 'codeword_ok') throw new Error()
+  } catch {
+    return res.status(401).json({ error: 'Wrong codeword' })
   }
+  const uid = req.user.userId
+  db.transaction(() => {
+    // Re-encrypt journal content
+    for (const row of db.prepare('SELECT id, content FROM journal WHERE user_id = ?').all(uid)) {
+      const plain = decryptField(row.content, codeword)
+      db.prepare('UPDATE journal SET content = ? WHERE id = ?').run(encryptField(plain, newCodeword), row.id)
+    }
+    // Re-encrypt study chapters content
+    for (const topic of db.prepare('SELECT id FROM study_topics WHERE user_id = ?').all(uid)) {
+      for (const ch of db.prepare('SELECT id, content FROM study_chapters WHERE topic_id = ?').all(topic.id)) {
+        const plain = decryptField(ch.content, codeword)
+        db.prepare('UPDATE study_chapters SET content = ? WHERE id = ?').run(encryptField(plain, newCodeword), ch.id)
+      }
+    }
+    // Update verifier
+    db.prepare('UPDATE users SET codeword_verifier = ? WHERE id = ?').run(encrypt('codeword_ok', newCodeword), uid)
+  })()
+  res.json({ ok: true })
 })
 
 export default router

@@ -5,7 +5,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { unlink } from 'fs/promises'
 import { requireAuth } from '../middleware/auth.js'
-import { getUserData, setUserData } from '../db/userStore.js'
+import db from '../db/sqlite.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const UPLOADS_DIR = join(__dirname, '../../uploads')
@@ -22,135 +22,72 @@ const upload = multer({
 const router = Router()
 router.use(requireAuth)
 
-router.get('/tracks', async (req, res) => {
-  const { codeword } = req.headers
-  if (!codeword) return res.status(400).json({ error: 'codeword header required' })
-  try {
-    const data = await getUserData(req.user.userId, codeword)
-    res.json(data.tracks)
-  } catch (e) {
-    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
-    res.status(500).json({ error: e.message })
-  }
+function rowToTrack(r) {
+  return { id: r.id, title: r.title, artist: r.artist, filename: r.filename, cover: r.cover, uploadedAt: r.uploaded_at }
+}
+function rowToPlaylist(r) {
+  const trackIds = db.prepare('SELECT track_id FROM playlist_tracks WHERE playlist_id = ? ORDER BY position').all(r.id).map(t => t.track_id)
+  return { id: r.id, name: r.name, trackIds, createdAt: r.created_at }
+}
+
+// ── Tracks ────────────────────────────────────────────────────────────────────
+router.get('/tracks', (req, res) => {
+  res.json(db.prepare('SELECT * FROM music_tracks WHERE user_id = ? ORDER BY uploaded_at DESC').all(req.user.userId).map(rowToTrack))
 })
 
-router.post('/tracks', upload.single('file'), async (req, res) => {
-  const { codeword } = req.headers
-  if (!codeword) return res.status(400).json({ error: 'codeword header required' })
+router.post('/tracks', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'MP3 file required' })
-  try {
-    const data = await getUserData(req.user.userId, codeword)
-    const track = {
-      id: uuidv4(),
-      title: req.body.title || req.file.originalname.replace('.mp3', ''),
-      artist: req.body.artist || '',
-      filename: req.file.filename,
-      size: req.file.size,
-      uploadedAt: new Date().toISOString()
-    }
-    data.tracks.push(track)
-    await setUserData(req.user.userId, codeword, data)
-    res.json(track)
-  } catch (e) {
-    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
-    res.status(500).json({ error: e.message })
-  }
+  const track = { id: uuidv4(), user_id: req.user.userId, title: req.body.title || req.file.originalname.replace('.mp3', ''), artist: req.body.artist || '', filename: req.file.filename, cover: null, uploaded_at: new Date().toISOString() }
+  db.prepare('INSERT INTO music_tracks (id, user_id, title, artist, filename, cover, uploaded_at) VALUES (?,?,?,?,?,?,?)').run(track.id, track.user_id, track.title, track.artist, track.filename, track.cover, track.uploaded_at)
+  res.json(rowToTrack(track))
 })
 
-router.put('/tracks/:id', async (req, res) => {
-  const { codeword } = req.headers
-  if (!codeword) return res.status(400).json({ error: 'codeword header required' })
-  try {
-    const data = await getUserData(req.user.userId, codeword)
-    const idx = data.tracks.findIndex(t => t.id === req.params.id)
-    if (idx === -1) return res.status(404).json({ error: 'Not found' })
-    const { title, artist, cover } = req.body
-    if (title !== undefined) data.tracks[idx].title = title
-    if (artist !== undefined) data.tracks[idx].artist = artist
-    if (cover !== undefined) data.tracks[idx].cover = cover
-    await setUserData(req.user.userId, codeword, data)
-    res.json(data.tracks[idx])
-  } catch (e) {
-    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
-    res.status(500).json({ error: e.message })
-  }
+router.put('/tracks/:id', (req, res) => {
+  const row = db.prepare('SELECT * FROM music_tracks WHERE id = ? AND user_id = ?').get(req.params.id, req.user.userId)
+  if (!row) return res.status(404).json({ error: 'Not found' })
+  const title = req.body.title ?? row.title
+  const artist = req.body.artist ?? row.artist
+  const cover = req.body.cover !== undefined ? req.body.cover : row.cover
+  db.prepare('UPDATE music_tracks SET title=?, artist=?, cover=? WHERE id=?').run(title, artist, cover, row.id)
+  res.json(rowToTrack({ ...row, title, artist, cover }))
 })
 
 router.delete('/tracks/:id', async (req, res) => {
-  const { codeword } = req.headers
-  if (!codeword) return res.status(400).json({ error: 'codeword header required' })
-  try {
-    const data = await getUserData(req.user.userId, codeword)
-    const track = data.tracks.find(t => t.id === req.params.id)
-    if (!track) return res.status(404).json({ error: 'Not found' })
-    data.tracks = data.tracks.filter(t => t.id !== req.params.id)
-    data.playlists = data.playlists.map(p => ({
-      ...p, trackIds: p.trackIds.filter(id => id !== req.params.id)
-    }))
-    await setUserData(req.user.userId, codeword, data)
-    try { await unlink(join(UPLOADS_DIR, track.filename)) } catch {}
-    res.json({ ok: true })
-  } catch (e) {
-    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
-    res.status(500).json({ error: e.message })
-  }
+  const row = db.prepare('SELECT * FROM music_tracks WHERE id = ? AND user_id = ?').get(req.params.id, req.user.userId)
+  if (!row) return res.status(404).json({ error: 'Not found' })
+  db.prepare('DELETE FROM playlist_tracks WHERE track_id = ?').run(row.id)
+  db.prepare('DELETE FROM music_tracks WHERE id = ?').run(row.id)
+  try { await unlink(join(UPLOADS_DIR, row.filename)) } catch {}
+  res.json({ ok: true })
 })
 
-router.get('/playlists', async (req, res) => {
-  const { codeword } = req.headers
-  if (!codeword) return res.status(400).json({ error: 'codeword header required' })
-  try {
-    const data = await getUserData(req.user.userId, codeword)
-    res.json(data.playlists)
-  } catch (e) {
-    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
-    res.status(500).json({ error: e.message })
-  }
+// ── Playlists ─────────────────────────────────────────────────────────────────
+router.get('/playlists', (req, res) => {
+  res.json(db.prepare('SELECT * FROM music_playlists WHERE user_id = ? ORDER BY created_at').all(req.user.userId).map(rowToPlaylist))
 })
 
-router.post('/playlists', async (req, res) => {
-  const { codeword } = req.headers
-  if (!codeword) return res.status(400).json({ error: 'codeword header required' })
-  try {
-    const data = await getUserData(req.user.userId, codeword)
-    const playlist = { id: uuidv4(), name: req.body.name, trackIds: req.body.trackIds || [], createdAt: new Date().toISOString() }
-    data.playlists.push(playlist)
-    await setUserData(req.user.userId, codeword, data)
-    res.json(playlist)
-  } catch (e) {
-    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
-    res.status(500).json({ error: e.message })
-  }
+router.post('/playlists', (req, res) => {
+  const p = { id: uuidv4(), user_id: req.user.userId, name: req.body.name, created_at: new Date().toISOString() }
+  db.prepare('INSERT INTO music_playlists (id, user_id, name, created_at) VALUES (?,?,?,?)').run(p.id, p.user_id, p.name, p.created_at)
+  res.json(rowToPlaylist(p))
 })
 
-router.put('/playlists/:id', async (req, res) => {
-  const { codeword } = req.headers
-  if (!codeword) return res.status(400).json({ error: 'codeword header required' })
-  try {
-    const data = await getUserData(req.user.userId, codeword)
-    const idx = data.playlists.findIndex(p => p.id === req.params.id)
-    if (idx === -1) return res.status(404).json({ error: 'Not found' })
-    data.playlists[idx] = { ...data.playlists[idx], ...req.body }
-    await setUserData(req.user.userId, codeword, data)
-    res.json(data.playlists[idx])
-  } catch (e) {
-    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
-    res.status(500).json({ error: e.message })
+router.put('/playlists/:id', (req, res) => {
+  const row = db.prepare('SELECT * FROM music_playlists WHERE id = ? AND user_id = ?').get(req.params.id, req.user.userId)
+  if (!row) return res.status(404).json({ error: 'Not found' })
+  if (req.body.name != null) db.prepare('UPDATE music_playlists SET name=? WHERE id=?').run(req.body.name, row.id)
+  if (req.body.trackIds != null) {
+    db.prepare('DELETE FROM playlist_tracks WHERE playlist_id = ?').run(row.id)
+    const ins = db.prepare('INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?,?,?)')
+    req.body.trackIds.forEach((tid, i) => ins.run(row.id, tid, i))
   }
+  res.json(rowToPlaylist({ ...row, name: req.body.name ?? row.name }))
 })
 
-router.delete('/playlists/:id', async (req, res) => {
-  const { codeword } = req.headers
-  if (!codeword) return res.status(400).json({ error: 'codeword header required' })
-  try {
-    const data = await getUserData(req.user.userId, codeword)
-    data.playlists = data.playlists.filter(p => p.id !== req.params.id)
-    await setUserData(req.user.userId, codeword, data)
-    res.json({ ok: true })
-  } catch (e) {
-    if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
-    res.status(500).json({ error: e.message })
-  }
+router.delete('/playlists/:id', (req, res) => {
+  db.prepare('DELETE FROM playlist_tracks WHERE playlist_id = ?').run(req.params.id)
+  db.prepare('DELETE FROM music_playlists WHERE id = ? AND user_id = ?').run(req.params.id, req.user.userId)
+  res.json({ ok: true })
 })
 
 export default router

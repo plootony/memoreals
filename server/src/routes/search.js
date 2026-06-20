@@ -1,58 +1,48 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.js'
-import { getUserData } from '../db/userStore.js'
+import db from '../db/sqlite.js'
+import { decryptField } from '../utils/fieldCrypto.js'
 
 const router = Router()
 router.use(requireAuth)
 
-function stripHtml(html) {
-  return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-}
+function strip(html) { return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() }
 
-router.get('/', async (req, res) => {
+router.get('/', (req, res) => {
   const { codeword } = req.headers
   const { q } = req.query
-  if (!codeword) return res.status(400).json({ error: 'codeword required' })
-  if (!q || q.length < 2) return res.json({ journal: [], plans: [], study: [], finance: [] })
+  if (!q || q.length < 2) return res.json({ journal: [], plans: [], study: [], finance: [], wishlist: [] })
+  const uid = req.user.userId
+  const query = q.toLowerCase()
 
   try {
-    const data = await getUserData(req.user.userId, codeword)
-    const query = q.toLowerCase()
+    const journal = db.prepare('SELECT id, title, date, content FROM journal WHERE user_id = ?').all(uid)
+      .filter(r => r.title?.toLowerCase().includes(query) || strip(decryptField(r.content, codeword || '')).toLowerCase().includes(query))
+      .slice(0, 5).map(r => ({ id: r.id, title: r.title || 'Без названия', subtitle: r.date, section: 'journal' }))
 
-    const journal = (data.journal || [])
-      .filter(e => e.title?.toLowerCase().includes(query) || stripHtml(e.content).toLowerCase().includes(query))
-      .slice(0, 5)
-      .map(e => ({ id: e.id, title: e.title || 'Без названия', subtitle: e.date, section: 'journal' }))
+    const plans = db.prepare("SELECT id, title, description, category, priority FROM tasks WHERE user_id = ? AND status != 'done'").all(uid)
+      .filter(r => r.title.toLowerCase().includes(query) || r.description?.toLowerCase().includes(query))
+      .slice(0, 5).map(r => ({ id: r.id, title: r.title, subtitle: r.category || r.priority, section: 'plans' }))
 
-    const plans = (data.plans?.tasks || [])
-      .filter(t => t.title.toLowerCase().includes(query) || t.description?.toLowerCase().includes(query))
-      .slice(0, 5)
-      .map(t => ({ id: t.id, title: t.title, subtitle: t.category || t.priority, section: 'plans' }))
+    const topicsRaw = db.prepare('SELECT * FROM study_topics WHERE user_id = ?').all(uid)
+    const study = []
+    for (const t of topicsRaw) {
+      if (t.title.toLowerCase().includes(query)) study.push({ id: t.id, title: t.title, subtitle: 'Тема', section: 'study' })
+      for (const ch of db.prepare('SELECT id, title, content FROM study_chapters WHERE topic_id = ?').all(t.id)) {
+        const content = strip(decryptField(ch.content, codeword || ''))
+        if (ch.title.toLowerCase().includes(query) || content.toLowerCase().includes(query))
+          study.push({ id: ch.id, title: ch.title, subtitle: t.title, section: 'study' })
+      }
+      if (study.length >= 5) break
+    }
 
-    const study = (data.study || [])
-      .flatMap(topic => {
-        const results = []
-        if (topic.title.toLowerCase().includes(query))
-          results.push({ id: topic.id, title: topic.title, subtitle: 'Тема', section: 'study' })
-        for (const ch of topic.chapters || []) {
-          if (ch.title.toLowerCase().includes(query) || stripHtml(ch.content).toLowerCase().includes(query))
-            results.push({ id: ch.id, title: ch.title, subtitle: topic.title, section: 'study' })
-        }
-        return results
-      })
-      .slice(0, 5)
+    const finance = db.prepare('SELECT id, description, type, amount FROM transactions WHERE user_id = ? AND description LIKE ?').all(uid, `%${q}%`)
+      .slice(0, 5).map(r => ({ id: r.id, title: r.description, subtitle: `${r.type === 'income' ? '+' : '−'}${r.amount} ₽`, section: 'finance' }))
 
-    const finance = (data.transactions || [])
-      .filter(t => t.description?.toLowerCase().includes(query))
-      .slice(0, 5)
-      .map(t => ({ id: t.id, title: t.description, subtitle: `${t.type === 'income' ? '+' : '−'}${t.amount} ₽`, section: 'finance' }))
+    const wishlist = db.prepare('SELECT id, title, note, price, category FROM wishlist_items WHERE user_id = ? AND (title LIKE ? OR note LIKE ?)').all(uid, `%${q}%`, `%${q}%`)
+      .slice(0, 5).map(r => ({ id: r.id, title: r.title, subtitle: r.price ? `${r.price.toLocaleString('ru')} ₽` : r.category, section: 'wishlist' }))
 
-    const wishlist = (data.wishlist?.items || [])
-      .filter(i => i.title.toLowerCase().includes(query) || i.note?.toLowerCase().includes(query))
-      .slice(0, 5)
-      .map(i => ({ id: i.id, title: i.title, subtitle: i.price ? `${i.price.toLocaleString('ru')} ₽` : i.category, section: 'wishlist' }))
-
-    res.json({ journal, plans, study, finance, wishlist })
+    res.json({ journal, plans, study: study.slice(0, 5), finance, wishlist })
   } catch (e) {
     if (e.message === 'DECRYPT_FAILED') return res.status(401).json({ error: 'Wrong codeword' })
     res.status(500).json({ error: e.message })

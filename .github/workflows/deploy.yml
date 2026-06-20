@@ -20,8 +20,9 @@ jobs:
             cd /root/memoreals
             git fetch origin main
             git reset --hard origin/main
-            npm install --workspace=server --omit=dev
+            npm install --workspace=server
             npm install --workspace=client
             npm run build --workspace=client
             pm2 restart memoreals
+            chmod 600 /root/memoreals/server/data/db.sqlite 2>/dev/null || true
             echo "✅ Deploy done at $(date)"
