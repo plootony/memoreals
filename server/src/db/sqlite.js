@@ -299,6 +299,7 @@ db.exec(`
 for (const sql of [
   'ALTER TABLE photo_albums ADD COLUMN cover_photo_id TEXT',
   "ALTER TABLE photo_albums ADD COLUMN description TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE journal ADD COLUMN mood TEXT NOT NULL DEFAULT ''",
 ]) {
   try { db.exec(sql) } catch {}
 }
