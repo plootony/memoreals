@@ -958,19 +958,32 @@ async function saveGoals() {
 
         <!-- Граммовка -->
         <div class="space-y-2">
-          <Label>Граммовка</Label>
+          <div class="flex items-center justify-between">
+            <Label>Граммовка</Label>
+            <span class="text-sm font-semibold text-primary">{{ addGrams }}г</span>
+          </div>
+
+          <!-- Пресеты -->
           <div class="flex flex-wrap gap-1.5">
             <button v-for="g in [25, 50, 75, 100, 125, 150, 200, 250]" :key="g"
               :class="['px-2.5 py-1 rounded-md text-xs font-medium border transition-colors',
                 addGrams === g ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted text-muted-foreground border-transparent hover:border-border']"
               @click="addGrams = g">{{ g }}г</button>
           </div>
-          <div class="flex items-center gap-2">
-            <button class="w-9 h-9 rounded-md border flex items-center justify-center text-lg hover:bg-accent transition-colors"
-              @click="addGrams = Math.max(25, addGrams - 25)">−</button>
-            <Input v-model.number="addGrams" type="number" min="25" step="25" class="flex-1 text-center" />
-            <button class="w-9 h-9 rounded-md border flex items-center justify-center text-lg hover:bg-accent transition-colors"
-              @click="addGrams = addGrams + 25">+</button>
+
+          <!-- Точный ввод -->
+          <div class="flex items-center gap-1.5">
+            <button class="px-2.5 h-9 rounded-md border text-xs font-medium hover:bg-accent transition-colors flex-shrink-0"
+              @click="addGrams = Math.max(1, addGrams - 5)">−5</button>
+            <button class="px-2.5 h-9 rounded-md border text-xs font-medium hover:bg-accent transition-colors flex-shrink-0"
+              @click="addGrams = Math.max(1, addGrams - 1)">−1</button>
+            <Input v-model.number="addGrams" type="number" min="1" step="1"
+              class="flex-1 text-center font-semibold"
+              @change="addGrams = Math.max(1, Math.round(addGrams))" />
+            <button class="px-2.5 h-9 rounded-md border text-xs font-medium hover:bg-accent transition-colors flex-shrink-0"
+              @click="addGrams = addGrams + 1">+1</button>
+            <button class="px-2.5 h-9 rounded-md border text-xs font-medium hover:bg-accent transition-colors flex-shrink-0"
+              @click="addGrams = addGrams + 5">+5</button>
           </div>
         </div>
 
