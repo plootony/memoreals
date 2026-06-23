@@ -51,8 +51,24 @@ export function restoreCodewordSync(): string | null {
 
 export async function restoreCodewordWithPin(pin: string): Promise<string | null> {
   const stored = localStorage.getItem(STORED_KEY)
-  if (!stored?.startsWith('e:')) return null
-  try { return await decryptWithPin(stored.slice(2), pin) } catch { return null }
+  if (!stored) return null
+
+  // Encrypted with PIN — normal case
+  if (stored.startsWith('e:')) {
+    try { return await decryptWithPin(stored.slice(2), pin) } catch { return null }
+  }
+
+  // Plain format — was stored before PIN was set. Read it and re-encrypt with PIN so
+  // next unlock needs only PIN (no codeword prompt).
+  if (stored.startsWith('p:')) {
+    try {
+      const cw = decodeURIComponent(atob(stored.slice(2)))
+      await persistCodeword(cw, pin)
+      return cw
+    } catch { return null }
+  }
+
+  return null
 }
 
 export function clearPersistedCodeword(): void {

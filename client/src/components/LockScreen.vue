@@ -83,11 +83,13 @@ async function submitCodeword() {
           </div>
         </template>
 
-        <!-- Codeword input mode (PIN not set, session restored from token) -->
+        <!-- Codeword input mode (no PIN set, or PIN couldn't restore codeword) -->
         <template v-else>
           <div class="text-center">
-            <h2 class="text-xl font-semibold">Добро пожаловать</h2>
-            <p class="text-sm text-muted-foreground mt-1">Введите кодовое слово для продолжения</p>
+            <h2 class="text-xl font-semibold">Кодовое слово</h2>
+            <p class="text-sm text-muted-foreground mt-1">
+              Нужно один раз — после этого будет достаточно только PIN
+            </p>
           </div>
           <div class="w-full space-y-3">
             <Input
