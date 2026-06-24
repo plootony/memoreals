@@ -3,9 +3,13 @@ import { v4 as uuidv4 } from 'uuid'
 import multer from 'multer'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { unlink } from 'fs/promises'
+import { unlink, readdir } from 'fs/promises'
+import { exec } from 'child_process'
+import { promisify } from 'util'
 import { requireAuth } from '../middleware/auth.js'
 import db from '../db/sqlite.js'
+
+const execAsync = promisify(exec)
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const UPLOADS_DIR = join(__dirname, '../../uploads')
@@ -88,6 +92,49 @@ router.delete('/playlists/:id', (req, res) => {
   db.prepare('DELETE FROM playlist_tracks WHERE playlist_id = ?').run(req.params.id)
   db.prepare('DELETE FROM music_playlists WHERE id = ? AND user_id = ?').run(req.params.id, req.user.userId)
   res.json({ ok: true })
+})
+
+// ── YouTube → MP3 ─────────────────────────────────────────────────────────────
+router.post('/youtube', async (req, res) => {
+  const { url } = req.body
+  if (!url || !/youtu\.?be/.test(url)) return res.status(400).json({ error: 'Invalid YouTube URL' })
+
+  try {
+    // Get video info first
+    const { stdout: infoJson } = await execAsync(
+      `yt-dlp --dump-json --no-playlist "${url}"`,
+      { timeout: 30000 }
+    )
+    const info = JSON.parse(infoJson)
+    const title  = info.title  || 'Unknown'
+    const artist = info.uploader || info.channel || ''
+
+    const filename = `${uuidv4()}.mp3`
+    const outPath  = join(UPLOADS_DIR, filename)
+
+    // Download and convert to MP3
+    await execAsync(
+      `yt-dlp --no-playlist -x --audio-format mp3 --audio-quality 0 -o "${outPath}" "${url}"`,
+      { timeout: 300000 }
+    )
+
+    const track = {
+      id: uuidv4(),
+      user_id: req.user.userId,
+      title,
+      artist,
+      filename,
+      cover: info.thumbnail || null,
+      uploaded_at: new Date().toISOString(),
+    }
+    db.prepare('INSERT INTO music_tracks (id, user_id, title, artist, filename, cover, uploaded_at) VALUES (?,?,?,?,?,?,?)')
+      .run(track.id, track.user_id, track.title, track.artist, track.filename, track.cover, track.uploaded_at)
+
+    res.json({ id: track.id, title: track.title, artist: track.artist, filename: track.filename, cover: track.cover, uploadedAt: track.uploaded_at })
+  } catch (e) {
+    console.error('yt-dlp error:', e.message)
+    res.status(500).json({ error: 'Не удалось скачать. Видео может быть недоступно или защищено.' })
+  }
 })
 
 export default router

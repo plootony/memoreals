@@ -9,7 +9,7 @@ import Input from '@/components/ui/Input.vue'
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
   Volume2, VolumeX, Upload, Trash2, Music, Plus, ListPlus,
-  Pencil, Check, X, ImagePlus, ListX, Loader2
+  Pencil, Check, X, ImagePlus, ListX, Loader2, Youtube
 } from 'lucide-vue-next'
 
 const player = usePlayerStore()
@@ -28,6 +28,30 @@ const coverInputRef = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const coverUploading = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+
+// YouTube converter
+const ytUrl = ref('')
+const ytLoading = ref(false)
+const ytError = ref('')
+const ytSuccess = ref('')
+
+async function downloadFromYoutube() {
+  if (!ytUrl.value.trim()) return
+  ytError.value = ''
+  ytSuccess.value = ''
+  ytLoading.value = true
+  try {
+    const res = await api.post('/music/youtube', { url: ytUrl.value.trim() })
+    ytSuccess.value = `✓ "${res.data.title}" добавлен`
+    ytUrl.value = ''
+    await player.load()
+    setTimeout(() => ytSuccess.value = '', 4000)
+  } catch (e: any) {
+    ytError.value = e.response?.data?.error || 'Ошибка загрузки'
+  } finally {
+    ytLoading.value = false
+  }
+}
 
 // Playlist dropdown
 const playlistMenuTrackId = ref<string | null>(null)
@@ -137,6 +161,30 @@ onUnmounted(() => document.removeEventListener('click', closePlaylistMenu))
         <input ref="coverInputRef" type="file" accept="image/*" class="hidden" @change="onCoverSelected" />
       </div>
     </div>
+
+    <!-- YouTube converter -->
+    <Card class="p-4 space-y-3">
+      <div class="flex items-center gap-2">
+        <Youtube class="w-4 h-4 text-red-500 flex-shrink-0" />
+        <span class="text-sm font-semibold">YouTube → MP3</span>
+      </div>
+      <div class="flex gap-2">
+        <Input
+          v-model="ytUrl"
+          placeholder="https://youtube.com/watch?v=..."
+          class="flex-1 text-sm"
+          @keyup.enter="downloadFromYoutube"
+          :disabled="ytLoading"
+        />
+        <Button @click="downloadFromYoutube" :disabled="ytLoading || !ytUrl.trim()" size="sm">
+          <Loader2 v-if="ytLoading" class="w-4 h-4 animate-spin" />
+          <span v-else>Скачать</span>
+        </Button>
+      </div>
+      <p v-if="ytLoading" class="text-xs text-muted-foreground">Скачивание может занять минуту...</p>
+      <p v-if="ytError" class="text-xs text-destructive">{{ ytError }}</p>
+      <p v-if="ytSuccess" class="text-xs text-green-500">{{ ytSuccess }}</p>
+    </Card>
 
     <!-- Player card -->
     <Card class="p-4 space-y-3" v-if="player.tracks.length > 0">
