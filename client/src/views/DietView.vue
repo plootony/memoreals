@@ -513,9 +513,9 @@ async function saveGoals() {
         <div class="h-full rounded-full bg-orange-500 transition-all" :style="`width:${pct(totals.calories, goals.calories)}%`" />
       </div>
       <div class="grid grid-cols-3 gap-3">
-        <div v-for="[key, label, color] in [['protein','Белки','bg-blue-500'],['fat','Жиры','bg-yellow-500'],['carbs','Углеводы','bg-green-500']]" :key="key">
+        <div v-for="[key, label, color] in [['protein','Б','bg-blue-500'],['fat','Ж','bg-yellow-500'],['carbs','У','bg-green-500']]" :key="key">
           <div class="flex justify-between text-xs text-muted-foreground mb-1">
-            <span>{{ label }}</span><span>{{ Math.round((totals as any)[key]) }}г / {{ (goals as any)[key] }}г</span>
+            <span>{{ label }}</span><span>{{ Math.round((totals as any)[key]) }} / {{ (goals as any)[key] }}г</span>
           </div>
           <div class="h-1.5 rounded-full bg-muted overflow-hidden">
             <div :class="['h-full rounded-full transition-all', color]" :style="`width:${pct((totals as any)[key], (goals as any)[key])}%`" />
