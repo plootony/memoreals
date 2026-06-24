@@ -58,30 +58,22 @@ function toggleMute() {
     </div>
 
     <!-- Progress -->
-    <div class="hidden sm:flex items-center gap-2 w-48 flex-shrink-0">
-      <span class="text-xs text-muted-foreground w-8 text-right">{{ formatTime(player.progress) }}</span>
+    <div class="hidden sm:flex items-center gap-2 flex-shrink-0" style="width:clamp(120px,30vw,220px)">
+      <span class="text-xs text-muted-foreground w-7 text-right flex-shrink-0">{{ formatTime(player.progress) }}</span>
       <input
         type="range"
         :max="player.duration || 100"
         :value="player.progress"
         @input="onSeek"
-        class="flex-1 h-1 accent-primary"
+        class="flex-1 h-1 accent-primary min-w-0"
       />
-      <span class="text-xs text-muted-foreground w-8">{{ formatTime(player.duration) }}</span>
+      <span class="text-xs text-muted-foreground w-7 flex-shrink-0">{{ formatTime(player.duration) }}</span>
     </div>
 
-    <!-- Volume -->
-    <div class="hidden md:flex items-center gap-1.5 w-24 flex-shrink-0">
-      <button @click="toggleMute()" class="p-1 hover:text-foreground text-muted-foreground">
-        <VolumeX v-if="player.volume === 0" class="w-4 h-4" />
-        <Volume2 v-else class="w-4 h-4" />
-      </button>
-      <input
-        type="range" min="0" max="1" step="0.01"
-        :value="player.volume"
-        @input="player.setVolume(Number(($event.target as HTMLInputElement).value))"
-        class="flex-1 h-1 accent-primary"
-      />
-    </div>
+    <!-- Volume: icon only in mini player, full slider on music page -->
+    <button @click="toggleMute()" class="hidden sm:flex p-1 flex-shrink-0 hover:text-foreground text-muted-foreground">
+      <VolumeX v-if="player.volume === 0" class="w-4 h-4" />
+      <Volume2 v-else class="w-4 h-4" />
+    </button>
   </div>
 </template>
