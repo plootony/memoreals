@@ -43,11 +43,18 @@ export const usePlayerStore = defineStore('player', () => {
     return `/uploads/${track.filename}`
   }
 
+  function safePlay() {
+    const p = audio.play()
+    if (p !== undefined) p.catch(err => {
+      if (err.name !== 'AbortError') console.error('audio play error:', err)
+    })
+  }
+
   function play(track: Track, idx: number) {
     currentTrack.value = track
     currentIndex.value = idx
     audio.src = trackUrl(track)
-    audio.play()
+    safePlay()
   }
 
   function togglePlay() {
@@ -56,7 +63,7 @@ export const usePlayerStore = defineStore('player', () => {
     } else if (isPlaying.value) {
       audio.pause()
     } else {
-      audio.play()
+      safePlay()
     }
   }
 
