@@ -4,13 +4,16 @@ import multer from 'multer'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { unlink, readdir } from 'fs/promises'
-import { exec } from 'child_process'
+import { execFile as execFileCb } from 'child_process'
 import { promisify } from 'util'
 import { requireAuth } from '../middleware/auth.js'
 import { uploadToR2 } from '../services/r2.js'
 import db from '../db/sqlite.js'
 
-const execAsync = promisify(exec)
+const execFile = promisify(execFileCb)
+
+// Strict YouTube URL whitelist — prevents command injection
+const YT_URL_RE = /^https?:\/\/(www\.)?(youtube\.com\/watch\?.*v=[\w-]+|youtu\.be\/[\w-]+)/
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const UPLOADS_DIR = join(__dirname, '../../uploads')
@@ -100,7 +103,7 @@ const ytJobs = new Map() // jobId → { status, track, error }
 
 router.post('/youtube', async (req, res) => {
   const { url } = req.body
-  if (!url || !/youtu\.?be/.test(url)) return res.status(400).json({ error: 'Invalid YouTube URL' })
+  if (!url || !YT_URL_RE.test(url)) return res.status(400).json({ error: 'Invalid YouTube URL' })
 
   const jobId = uuidv4()
   ytJobs.set(jobId, { status: 'pending' })
@@ -109,19 +112,20 @@ router.post('/youtube', async (req, res) => {
   // Run download in background
   ;(async () => {
     try {
-      const { stdout: infoJson } = await execAsync(
-        `yt-dlp --dump-json --no-playlist "${url}"`,
+      // Use execFile (args as array) — no shell, no injection possible
+      const { stdout: infoJson } = await execFile(
+        'yt-dlp', ['--dump-json', '--no-playlist', url],
         { timeout: 60000 }
       )
       const info   = JSON.parse(infoJson)
-      const title  = info.title || 'Unknown'
-      const artist = info.uploader || info.channel || ''
+      const title  = (info.title || 'Unknown').slice(0, 200)
+      const artist = (info.uploader || info.channel || '').slice(0, 100)
 
       const filename = `${uuidv4()}.mp3`
       const outPath  = join(UPLOADS_DIR, filename)
 
-      await execAsync(
-        `yt-dlp --no-playlist -x --audio-format mp3 --audio-quality 0 -o "${outPath}" "${url}"`,
+      await execFile(
+        'yt-dlp', ['--no-playlist', '-x', '--audio-format', 'mp3', '--audio-quality', '0', '-o', outPath, url],
         { timeout: 600000 }
       )
 

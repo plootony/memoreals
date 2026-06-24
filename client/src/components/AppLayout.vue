@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useLockStore } from '@/stores/lock'
@@ -90,6 +90,11 @@ onMounted(() => {
     lock.setupActivity()
     checkReminders()
   }
+})
+
+onUnmounted(() => {
+  lock.teardownActivity()
+  if (reminderTimer) clearInterval(reminderTimer)
 })
 </script>
 

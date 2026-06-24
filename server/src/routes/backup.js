@@ -107,7 +107,9 @@ router.post('/restore', async (req, res) => {
 
     // 5. Перезапускаем PM2
     res.json({ ok: true })
-    setTimeout(() => execAsync('pm2 restart memoreals').catch(() => {}), 200)
+    setTimeout(() => {
+      ;(async () => { try { await execAsync('pm2 restart memoreals') } catch {} })()
+    }, 200)
 
   } catch (e) {
     res.status(500).json({ error: e.message })

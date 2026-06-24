@@ -25,7 +25,14 @@ const PORT = process.env.PORT || 3001
 
 const app = express()
 
-app.use(cors({ origin: true, credentials: true }))
+// In production the frontend is served from the same origin, so CORS is only
+// needed for local dev. Never reflect all origins with credentials.
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? false                          // same-origin only in prod
+    : ['http://localhost:5173', 'http://localhost:3001'],
+  credentials: true,
+}))
 app.use(express.json({ limit: '2mb' }))
 app.use('/uploads', express.static(join(__dirname, '../uploads')))
 

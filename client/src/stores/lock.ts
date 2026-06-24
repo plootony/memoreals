@@ -58,13 +58,22 @@ export const useLockStore = defineStore('lock', () => {
     timer = setTimeout(() => lock(), timeoutMinutes.value * 60 * 1000)
   }
 
+  const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click']
+  let activityHandler: (() => void) | null = null
+
   function setupActivity() {
-    if (!hasPin.value) return
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click']
-    const handler = () => { if (!isLocked.value) resetTimer() }
-    events.forEach(e => window.addEventListener(e, handler, { passive: true }))
+    if (!hasPin.value || activityHandler) return // prevent duplicate listeners
+    activityHandler = () => { if (!isLocked.value) resetTimer() }
+    ACTIVITY_EVENTS.forEach(e => window.addEventListener(e, activityHandler!, { passive: true }))
     if (!isLocked.value) resetTimer()
   }
 
-  return { isLocked, pin, timeoutMinutes, hasPin, lock, unlock, setPin, setTimeout: setTimeout_, resetTimer, setupActivity }
+  function teardownActivity() {
+    if (!activityHandler) return
+    ACTIVITY_EVENTS.forEach(e => window.removeEventListener(e, activityHandler!))
+    activityHandler = null
+    clearTimer()
+  }
+
+  return { isLocked, pin, timeoutMinutes, hasPin, lock, unlock, setPin, setTimeout: setTimeout_, resetTimer, setupActivity, teardownActivity }
 })
