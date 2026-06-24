@@ -94,47 +94,60 @@ router.delete('/playlists/:id', (req, res) => {
   res.json({ ok: true })
 })
 
-// ── YouTube → MP3 ─────────────────────────────────────────────────────────────
+// ── YouTube → MP3 (async job) ─────────────────────────────────────────────────
+const ytJobs = new Map() // jobId → { status, track, error }
+
 router.post('/youtube', async (req, res) => {
   const { url } = req.body
   if (!url || !/youtu\.?be/.test(url)) return res.status(400).json({ error: 'Invalid YouTube URL' })
 
-  try {
-    // Get video info first
-    const { stdout: infoJson } = await execAsync(
-      `yt-dlp --dump-json --no-playlist "${url}"`,
-      { timeout: 30000 }
-    )
-    const info = JSON.parse(infoJson)
-    const title  = info.title  || 'Unknown'
-    const artist = info.uploader || info.channel || ''
+  const jobId = uuidv4()
+  ytJobs.set(jobId, { status: 'pending' })
+  res.json({ jobId })
 
-    const filename = `${uuidv4()}.mp3`
-    const outPath  = join(UPLOADS_DIR, filename)
+  // Run download in background
+  ;(async () => {
+    try {
+      const { stdout: infoJson } = await execAsync(
+        `yt-dlp --dump-json --no-playlist "${url}"`,
+        { timeout: 60000 }
+      )
+      const info   = JSON.parse(infoJson)
+      const title  = info.title || 'Unknown'
+      const artist = info.uploader || info.channel || ''
 
-    // Download and convert to MP3
-    await execAsync(
-      `yt-dlp --no-playlist -x --audio-format mp3 --audio-quality 0 -o "${outPath}" "${url}"`,
-      { timeout: 300000 }
-    )
+      const filename = `${uuidv4()}.mp3`
+      const outPath  = join(UPLOADS_DIR, filename)
 
-    const track = {
-      id: uuidv4(),
-      user_id: req.user.userId,
-      title,
-      artist,
-      filename,
-      cover: info.thumbnail || null,
-      uploaded_at: new Date().toISOString(),
+      await execAsync(
+        `yt-dlp --no-playlist -x --audio-format mp3 --audio-quality 0 -o "${outPath}" "${url}"`,
+        { timeout: 600000 }
+      )
+
+      const track = {
+        id: uuidv4(),
+        user_id: req.user.userId,
+        title, artist, filename,
+        cover: info.thumbnail || null,
+        uploaded_at: new Date().toISOString(),
+      }
+      db.prepare('INSERT INTO music_tracks (id, user_id, title, artist, filename, cover, uploaded_at) VALUES (?,?,?,?,?,?,?)')
+        .run(track.id, track.user_id, track.title, track.artist, track.filename, track.cover, track.uploaded_at)
+
+      ytJobs.set(jobId, { status: 'done', track: { id: track.id, title, artist, filename, cover: track.cover } })
+    } catch (e) {
+      console.error('yt-dlp error:', e.message)
+      ytJobs.set(jobId, { status: 'error', error: 'Не удалось скачать. Видео может быть недоступно или защищено.' })
     }
-    db.prepare('INSERT INTO music_tracks (id, user_id, title, artist, filename, cover, uploaded_at) VALUES (?,?,?,?,?,?,?)')
-      .run(track.id, track.user_id, track.title, track.artist, track.filename, track.cover, track.uploaded_at)
+    // Clean up job after 10 min
+    setTimeout(() => ytJobs.delete(jobId), 600000)
+  })()
+})
 
-    res.json({ id: track.id, title: track.title, artist: track.artist, filename: track.filename, cover: track.cover, uploadedAt: track.uploaded_at })
-  } catch (e) {
-    console.error('yt-dlp error:', e.message)
-    res.status(500).json({ error: 'Не удалось скачать. Видео может быть недоступно или защищено.' })
-  }
+router.get('/youtube/:jobId', (req, res) => {
+  const job = ytJobs.get(req.params.jobId)
+  if (!job) return res.status(404).json({ error: 'Job not found' })
+  res.json(job)
 })
 
 export default router

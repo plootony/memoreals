@@ -34,22 +34,50 @@ const ytUrl = ref('')
 const ytLoading = ref(false)
 const ytError = ref('')
 const ytSuccess = ref('')
+const ytStatus = ref('')
 
 async function downloadFromYoutube() {
   if (!ytUrl.value.trim()) return
   ytError.value = ''
   ytSuccess.value = ''
+  ytStatus.value = ''
   ytLoading.value = true
+  const url = ytUrl.value.trim()
+  ytUrl.value = ''
+
   try {
-    const res = await api.post('/music/youtube', { url: ytUrl.value.trim() })
-    ytSuccess.value = `✓ "${res.data.title}" добавлен`
-    ytUrl.value = ''
-    await player.load()
-    setTimeout(() => ytSuccess.value = '', 4000)
+    // Start job
+    const { data } = await api.post('/music/youtube', { url })
+    const jobId = data.jobId
+    ytStatus.value = 'Скачивание...'
+
+    // Poll for result
+    const poll = async () => {
+      try {
+        const { data: job } = await api.get(`/music/youtube/${jobId}`)
+        if (job.status === 'done') {
+          ytLoading.value = false
+          ytStatus.value = ''
+          ytSuccess.value = `✓ "${job.track.title}" добавлен`
+          await player.load()
+          setTimeout(() => ytSuccess.value = '', 5000)
+        } else if (job.status === 'error') {
+          ytLoading.value = false
+          ytStatus.value = ''
+          ytError.value = job.error
+        } else {
+          setTimeout(poll, 3000)
+        }
+      } catch {
+        ytLoading.value = false
+        ytStatus.value = ''
+        ytError.value = 'Ошибка при проверке статуса'
+      }
+    }
+    setTimeout(poll, 3000)
   } catch (e: any) {
-    ytError.value = e.response?.data?.error || 'Ошибка загрузки'
-  } finally {
     ytLoading.value = false
+    ytError.value = e.response?.data?.error || 'Ошибка запуска загрузки'
   }
 }
 
@@ -181,7 +209,10 @@ onUnmounted(() => document.removeEventListener('click', closePlaylistMenu))
           <span v-else>Скачать</span>
         </Button>
       </div>
-      <p v-if="ytLoading" class="text-xs text-muted-foreground">Скачивание может занять минуту...</p>
+      <div v-if="ytLoading" class="flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 class="w-3 h-3 animate-spin flex-shrink-0" />
+        {{ ytStatus || 'Загрузка...' }} — это займёт 1–2 минуты
+      </div>
       <p v-if="ytError" class="text-xs text-destructive">{{ ytError }}</p>
       <p v-if="ytSuccess" class="text-xs text-green-500">{{ ytSuccess }}</p>
     </Card>
