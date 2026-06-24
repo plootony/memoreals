@@ -232,11 +232,22 @@ onUnmounted(() => document.removeEventListener('click', closePlaylistMenu))
         <p class="text-sm text-muted-foreground truncate">{{ player.currentTrack?.artist || '—' }}</p>
       </div>
 
-      <!-- Progress -->
+      <!-- Progress + Volume on same row -->
       <div class="flex items-center gap-2 text-xs text-muted-foreground">
-        <span class="w-8 text-right">{{ formatTime(player.progress) }}</span>
-        <input type="range" :max="player.duration || 100" :value="player.progress" @input="onSeek" class="flex-1 h-1 accent-primary" />
-        <span class="w-8">{{ formatTime(player.duration) }}</span>
+        <span class="w-8 text-right flex-shrink-0">{{ formatTime(player.progress) }}</span>
+        <input type="range" :max="player.duration || 100" :value="player.progress" @input="onSeek" class="flex-1 h-1 accent-primary min-w-0" />
+        <span class="w-8 flex-shrink-0">{{ formatTime(player.duration) }}</span>
+
+        <!-- Volume -->
+        <div class="flex items-center gap-1.5 ml-2 flex-shrink-0">
+          <button @click="toggleMute()" class="text-muted-foreground hover:text-foreground">
+            <VolumeX v-if="player.volume === 0" class="w-4 h-4" />
+            <Volume2 v-else class="w-4 h-4" />
+          </button>
+          <input type="range" min="0" max="1" step="0.01" :value="player.volume"
+            @input="player.setVolume(Number(($event.target as HTMLInputElement).value))"
+            class="w-20 h-1 accent-primary" />
+        </div>
       </div>
 
       <!-- Buttons -->
@@ -248,16 +259,6 @@ onUnmounted(() => document.removeEventListener('click', closePlaylistMenu))
         </button>
         <button @click="player.next()" class="p-2 rounded hover:bg-accent"><SkipForward class="w-5 h-5" /></button>
         <button @click="player.repeat = !player.repeat" :class="['p-2 rounded', player.repeat ? 'text-primary' : 'text-muted-foreground hover:text-foreground']"><Repeat class="w-4 h-4" /></button>
-      </div>
-
-      <!-- Volume -->
-      <div class="flex items-center gap-2">
-        <button @click="toggleMute()" class="text-muted-foreground hover:text-foreground">
-          <VolumeX v-if="player.volume === 0" class="w-4 h-4" /><Volume2 v-else class="w-4 h-4" />
-        </button>
-        <input type="range" min="0" max="1" step="0.01" :value="player.volume"
-          @input="player.setVolume(Number(($event.target as HTMLInputElement).value))"
-          class="flex-1 h-1 accent-primary" />
       </div>
     </Card>
 
