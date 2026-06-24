@@ -7,6 +7,7 @@ import { unlink, readdir } from 'fs/promises'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import { requireAuth } from '../middleware/auth.js'
+import { uploadToR2 } from '../services/r2.js'
 import db from '../db/sqlite.js'
 
 const execAsync = promisify(exec)
@@ -124,11 +125,26 @@ router.post('/youtube', async (req, res) => {
         { timeout: 600000 }
       )
 
+      // Download best thumbnail and upload to R2
+      let coverUrl = null
+      const thumbUrl = info.thumbnail
+        || (info.thumbnails?.sort((a, b) => (b.width || 0) - (a.width || 0))?.[0]?.url)
+      if (thumbUrl) {
+        try {
+          const resp = await fetch(thumbUrl)
+          const buf  = Buffer.from(await resp.arrayBuffer())
+          const ext  = thumbUrl.includes('.webp') ? 'webp' : 'jpg'
+          coverUrl   = await uploadToR2(buf, `cover_${uuidv4()}.${ext}`, `image/${ext}`)
+        } catch (e) {
+          console.warn('Thumbnail upload failed:', e.message)
+        }
+      }
+
       const track = {
         id: uuidv4(),
         user_id: req.user.userId,
         title, artist, filename,
-        cover: info.thumbnail || null,
+        cover: coverUrl,
         uploaded_at: new Date().toISOString(),
       }
       db.prepare('INSERT INTO music_tracks (id, user_id, title, artist, filename, cover, uploaded_at) VALUES (?,?,?,?,?,?,?)')
