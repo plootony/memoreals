@@ -27,4 +27,5 @@ jobs:
             npm run build --workspace=client
             pm2 restart memoreals
             chmod 600 /root/memoreals/server/data/db.sqlite 2>/dev/null || true
+            chmod +x /root/memoreals/server/scripts/backup.sh
             echo "✅ Deploy done at $(date)"
