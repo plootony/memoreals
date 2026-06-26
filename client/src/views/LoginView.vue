@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { restoreCodewordSync, clearPersistedCodeword, PIN_KEY } from '@/lib/pinCrypto'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Label from '@/components/ui/Label.vue'
@@ -13,9 +14,14 @@ const auth = useAuthStore()
 const mode = ref<'login' | 'register'>('login')
 const username = ref('')
 const password = ref('')
-const codeword = ref('')
 const error = ref('')
 const loading = ref(false)
+
+// If no PIN is set, try to restore codeword from localStorage automatically
+const hasPinSet = !!localStorage.getItem(PIN_KEY)
+const restoredCodeword = !hasPinSet ? restoreCodewordSync() : null
+const codeword = ref(restoredCodeword || '')
+const codewordVisible = ref(!restoredCodeword)
 
 async function submit() {
   error.value = ''
@@ -32,6 +38,11 @@ async function submit() {
     const msg = e.response?.data?.error
     const net = e.code || e.message
     error.value = msg || (status ? `HTTP ${status}` : `Сеть: ${net}`)
+    if (msg === 'Invalid codeword') {
+      clearPersistedCodeword()
+      codeword.value = ''
+      codewordVisible.value = true
+    }
   } finally {
     loading.value = false
   }
@@ -55,10 +66,19 @@ async function submit() {
           <Label for="password">Пароль</Label>
           <Input id="password" v-model="password" type="password" placeholder="••••••••" autocomplete="current-password" />
         </div>
-        <div class="space-y-1.5">
+
+        <div v-if="mode === 'register' || codewordVisible" class="space-y-1.5">
           <Label for="codeword">Кодовое слово</Label>
           <Input id="codeword" v-model="codeword" type="password" placeholder="Ключ шифрования данных" />
           <p class="text-xs text-muted-foreground">Без него данные невозможно расшифровать. Не забывайте его.</p>
+        </div>
+        <div v-else class="flex items-center justify-between py-0.5">
+          <p class="text-xs text-muted-foreground">Кодовое слово сохранено</p>
+          <button
+            type="button"
+            class="text-xs text-primary hover:underline"
+            @click="codewordVisible = true; codeword = ''"
+          >Изменить</button>
         </div>
 
         <p v-if="error" class="text-sm text-destructive">{{ error }}</p>

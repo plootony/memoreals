@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
-import { persistCodeword, restoreCodewordSync, clearPersistedCodeword, PIN_KEY } from '@/lib/pinCrypto'
+import { persistCodeword, restoreCodewordSync, PIN_KEY } from '@/lib/pinCrypto'
 
 const BASE = '/api'
 
@@ -60,7 +60,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('token')
     localStorage.removeItem('username')
     sessionStorage.removeItem('codeword')
-    clearPersistedCodeword()
+    // Persisted codeword stays in localStorage so it can be auto-restored on next login
   }
 
   return { token, codeword, username, isAuthenticated, needsCodeword, register, login, logout, setCodeword, restoreSession }
