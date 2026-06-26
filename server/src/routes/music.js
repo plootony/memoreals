@@ -131,8 +131,8 @@ router.post('/youtube', async (req, res) => {
 
       // Download best thumbnail and upload to R2
       let coverUrl = null
-      const thumbUrl = info.thumbnail
-        || (info.thumbnails?.sort((a, b) => (b.width || 0) - (a.width || 0))?.[0]?.url)
+      const thumbUrl = info.thumbnails?.sort((a, b) => (b.width || 0) - (a.width || 0))?.[0]?.url
+        || info.thumbnail
       if (thumbUrl) {
         try {
           const resp = await fetch(thumbUrl)
