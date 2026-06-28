@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
-import { persistCodeword, restoreCodewordSync, PIN_KEY } from '@/lib/pinCrypto'
+import { persistCodeword, restoreCodewordSync, decryptCWWithPassword, PIN_KEY } from '@/lib/pinCrypto'
 
 const BASE = '/api'
 
@@ -25,9 +25,11 @@ export const useAuthStore = defineStore('auth', () => {
     await _setSession(res.data, data.codeword)
   }
 
-  async function login(data: { username: string; password: string; codeword: string }) {
+  async function login(data: { username: string; password: string; codeword?: string }) {
     const res = await axios.post(`${BASE}/auth/login`, data)
-    await _setSession(res.data, data.codeword)
+    // Codeword was provided manually (migration case) or decrypt it from server's encrypted blob
+    const cw = data.codeword || await decryptCWWithPassword(res.data.codewordEncrypted, data.password)
+    await _setSession(res.data, cw)
   }
 
   async function _setSession(data: { token: string; username: string }, cw: string) {

@@ -37,6 +37,16 @@ router.delete('/items/:id', (req, res) => {
   res.json(getAll(req.user.userId))
 })
 
+router.put('/categories', (req, res) => {
+  const categories = Array.isArray(req.body.categories) ? req.body.categories : []
+  db.prepare('DELETE FROM wishlist_categories WHERE user_id = ?').run(req.user.userId)
+  const ins = db.prepare('INSERT INTO wishlist_categories (user_id, name) VALUES (?,?)')
+  for (const name of categories) {
+    if (name?.trim()) ins.run(req.user.userId, name.trim())
+  }
+  res.json(getAll(req.user.userId))
+})
+
 router.post('/categories', (req, res) => {
   db.prepare('INSERT OR IGNORE INTO wishlist_categories (user_id, name) VALUES (?,?)').run(req.user.userId, req.body.name)
   res.json(getAll(req.user.userId))

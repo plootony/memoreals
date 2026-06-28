@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { restoreCodewordSync, clearPersistedCodeword, PIN_KEY } from '@/lib/pinCrypto'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Label from '@/components/ui/Label.vue'
@@ -14,14 +13,11 @@ const auth = useAuthStore()
 const mode = ref<'login' | 'register'>('login')
 const username = ref('')
 const password = ref('')
+const codeword = ref('')
 const error = ref('')
 const loading = ref(false)
-
-// If no PIN is set, try to restore codeword from localStorage automatically
-const hasPinSet = !!localStorage.getItem(PIN_KEY)
-const restoredCodeword = !hasPinSet ? restoreCodewordSync() : null
-const codeword = ref(restoredCodeword || '')
-const codewordVisible = ref(!restoredCodeword)
+// Shown only when server says codeword_required (first login on unmigrated account)
+const needsCodeword = ref(false)
 
 async function submit() {
   error.value = ''
@@ -30,18 +26,23 @@ async function submit() {
     if (mode.value === 'register') {
       await auth.register({ username: username.value, password: password.value, codeword: codeword.value })
     } else {
-      await auth.login({ username: username.value, password: password.value, codeword: codeword.value })
+      await auth.login({
+        username: username.value,
+        password: password.value,
+        ...(needsCodeword.value ? { codeword: codeword.value } : {}),
+      })
     }
     router.push('/')
   } catch (e: any) {
-    const status = e.response?.status
     const msg = e.response?.data?.error
+    const status = e.response?.status
     const net = e.code || e.message
-    error.value = msg || (status ? `HTTP ${status}` : `Сеть: ${net}`)
-    if (msg === 'Invalid codeword') {
-      clearPersistedCodeword()
-      codeword.value = ''
-      codewordVisible.value = true
+    if (msg === 'codeword_required') {
+      // Server doesn't have encrypted codeword yet — ask user to enter it once
+      needsCodeword.value = true
+      error.value = 'Введите кодовое слово для завершения миграции'
+    } else {
+      error.value = msg || (status ? `HTTP ${status}` : `Сеть: ${net}`)
     }
   } finally {
     loading.value = false
@@ -67,21 +68,14 @@ async function submit() {
           <Input id="password" v-model="password" type="password" placeholder="••••••••" autocomplete="current-password" />
         </div>
 
-        <div v-if="mode === 'register' || codewordVisible" class="space-y-1.5">
+        <!-- Codeword: always shown on register; on login only if server requires it -->
+        <div v-if="mode === 'register' || needsCodeword" class="space-y-1.5">
           <Label for="codeword">Кодовое слово</Label>
           <Input id="codeword" v-model="codeword" type="password" placeholder="Ключ шифрования данных" />
-          <p class="text-xs text-muted-foreground">Без него данные невозможно расшифровать. Не забывайте его.</p>
-        </div>
-        <div v-else class="flex items-center justify-between py-0.5">
-          <p class="text-xs text-muted-foreground">Кодовое слово сохранено</p>
-          <button
-            type="button"
-            class="text-xs text-primary hover:underline"
-            @click="codewordVisible = true; codeword = ''"
-          >Изменить</button>
+          <p v-if="mode === 'register'" class="text-xs text-muted-foreground">Без него данные невозможно расшифровать. Не забывайте его.</p>
         </div>
 
-        <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
+        <p v-if="error" class="text-sm" :class="needsCodeword ? 'text-muted-foreground' : 'text-destructive'">{{ error }}</p>
 
         <Button type="submit" class="w-full" :disabled="loading">
           {{ loading ? 'Загрузка...' : (mode === 'login' ? 'Войти' : 'Зарегистрироваться') }}
@@ -92,7 +86,7 @@ async function submit() {
         {{ mode === 'login' ? 'Нет аккаунта?' : 'Уже есть аккаунт?' }}
         <button
           class="text-primary font-medium hover:underline ml-1"
-          @click="mode = mode === 'login' ? 'register' : 'login'"
+          @click="mode = mode === 'login' ? 'register' : 'login'; needsCodeword = false; error = ''"
         >
           {{ mode === 'login' ? 'Создать' : 'Войти' }}
         </button>

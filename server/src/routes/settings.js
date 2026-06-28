@@ -25,7 +25,13 @@ router.put('/password', async (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.userId)
   if (!user) return res.status(404).json({ error: 'User not found' })
   if (!await bcrypt.compare(currentPassword, user.password_hash)) return res.status(401).json({ error: 'Wrong current password' })
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await bcrypt.hash(newPassword, 12), user.id)
+  const newHash = await bcrypt.hash(newPassword, 12)
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, user.id)
+  // Re-encrypt codeword with new password so next login works
+  const codeword = req.headers.codeword
+  if (codeword && user.codeword_encrypted) {
+    db.prepare('UPDATE users SET codeword_encrypted = ? WHERE id = ?').run(encrypt(codeword, newPassword), user.id)
+  }
   res.json({ ok: true })
 })
 
@@ -56,8 +62,9 @@ router.put('/codeword', async (req, res) => {
         db.prepare('UPDATE study_chapters SET content = ? WHERE id = ?').run(encryptField(plain, newCodeword), ch.id)
       }
     }
-    // Update verifier
-    db.prepare('UPDATE users SET codeword_verifier = ? WHERE id = ?').run(encrypt('codeword_ok', newCodeword), uid)
+    // Update verifier and encrypted copy
+    db.prepare('UPDATE users SET codeword_verifier = ?, codeword_encrypted = ? WHERE id = ?')
+      .run(encrypt('codeword_ok', newCodeword), encrypt(newCodeword, password), uid)
   })()
   res.json({ ok: true })
 })

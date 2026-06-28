@@ -74,3 +74,29 @@ export async function restoreCodewordWithPin(pin: string): Promise<string | null
 export function clearPersistedCodeword(): void {
   localStorage.removeItem(STORED_KEY)
 }
+
+// Decrypts codeword_encrypted returned by the server (encrypted with user's password).
+// Matches server crypto.js format: salt(32) + iv(16) + tag(16) + ciphertext → base64
+export async function decryptCWWithPassword(encoded: string, password: string): Promise<string> {
+  const buf = Uint8Array.from(atob(encoded), c => c.charCodeAt(0))
+  const salt = buf.slice(0, 32)
+  const iv = buf.slice(32, 48)
+  const tag = buf.slice(48, 64)
+  const ciphertext = buf.slice(64)
+  // Web Crypto AES-GCM expects ciphertext || tag concatenated
+  const data = new Uint8Array(ciphertext.length + 16)
+  data.set(ciphertext)
+  data.set(tag, ciphertext.length)
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
+  )
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  )
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data)
+  return new TextDecoder().decode(decrypted)
+}
